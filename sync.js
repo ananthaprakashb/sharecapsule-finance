@@ -164,15 +164,20 @@
     return existing || createSyncConfig(vaultRecord);
   }
 
+  async function importPairingKey(pairSecretBytes, usages) {
+    const digest = await crypto.subtle.digest('SHA-256', pairSecretBytes);
+    return crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, usages);
+  }
+
   async function wrapTokenForPairing(token, pairSecretBytes) {
-    const key = await crypto.subtle.importKey('raw', pairSecretBytes, { name: 'AES-GCM' }, false, ['encrypt']);
+    const key = await importPairingKey(pairSecretBytes, ['encrypt']);
     const iv = randomBytes(12);
     const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoder.encode(token));
     return { wrappedToken: toBase64Url(new Uint8Array(ciphertext)), wrapIv: toBase64Url(iv) };
   }
 
   async function unwrapTokenFromPairing(wrappedToken, wrapIv, pairSecretBytes) {
-    const key = await crypto.subtle.importKey('raw', pairSecretBytes, { name: 'AES-GCM' }, false, ['decrypt']);
+    const key = await importPairingKey(pairSecretBytes, ['decrypt']);
     const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64Url(wrapIv) }, key, fromBase64Url(wrappedToken));
     return decoder.decode(plaintext);
   }
@@ -185,7 +190,7 @@
     await pushLocalIfNeeded(config, token, vaultRecord, true);
 
     const pairId = toBase64Url(randomBytes(8));
-    const pairSecretBytes = randomBytes(16);
+    const pairSecretBytes = randomBytes(24);
     const pairSecret = toBase64Url(pairSecretBytes);
     const secretHash = await sha256Text(pairSecret);
     const wrapped = await wrapTokenForPairing(token, pairSecretBytes);
@@ -224,7 +229,7 @@
   }
 
   async function claimPairingFromHash() {
-    const match = location.hash.match(/^#p=([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{11})\.([A-Za-z0-9_-]{22})$/);
+    const match = location.hash.match(/^#p=([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{11})\.([A-Za-z0-9_-]{32})$/);
     if (!match) return false;
     const [, vaultId, pairId, pairSecret] = match;
     showPairingOverlay('Connecting this device…', 'Fetching the encrypted vault. No financial data is readable by the sync relay.');
