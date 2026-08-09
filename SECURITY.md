@@ -1,61 +1,112 @@
-# Private Finance Planner — security model
+# ShareCapsule Finance — security model
 
-This feature handles financial information as highly sensitive data. The default architecture is deliberately local-first and does not require a ShareCapsule account, financial institution login, bank-aggregation provider, analytics provider, or server-side financial database.
+ShareCapsule Finance handles financial information as highly sensitive data. The default remains local-first. Multi-device synchronization is optional and is designed so that the sync relay receives only an already-encrypted vault envelope, never the vault passphrase or decrypted financial data.
 
-## Data-flow guarantee
+## Two operating modes
 
-The finance application must not transmit transaction, account balance, debt, budget, goal, or planning data to ShareCapsule or any third party.
+### 1. This device only — default
 
-The page currently enforces this at the browser layer with a Content Security Policy containing `connect-src 'none'` and by shipping no analytics, advertising, remote fonts, third-party JavaScript, bank SDKs, or AI API calls.
+- No finance sync traffic.
+- The encrypted vault stays in IndexedDB on the current device.
+- Financial calculations run locally.
+- No analytics, advertising, remote fonts, bank SDKs or AI finance-data calls are loaded.
 
-All financial calculations are deterministic JavaScript executed in the browser.
+### 2. Encrypted device sync — optional
 
-## Local encrypted vault
+- The same encrypted vault envelope is copied to a dedicated sync relay.
+- The relay cannot decrypt it because it never receives the vault passphrase.
+- Devices authenticate to the relay with a random sync capability protected locally on each device.
+- A new device is added with a one-time QR pairing capability that expires after five minutes and is consumed when claimed.
+- The second device still needs the existing vault passphrase to decrypt the financial vault.
 
-Persistent financial data is stored only as an encrypted IndexedDB record on the user's device.
+## Local vault encryption
+
+Persistent finance state uses the Web Crypto API:
 
 - Encryption: AES-GCM, 256-bit key.
 - Passphrase KDF: PBKDF2-HMAC-SHA-256.
 - PBKDF2 work factor: 600,000 iterations.
 - Salt: random 128-bit value per vault.
 - AES-GCM IV: new random 96-bit value for every save.
-- The passphrase is never persisted by the application.
-- The derived `CryptoKey` is non-extractable and exists only in page memory while the vault is unlocked.
-- The decrypted JSON is kept only in page memory.
-- The app locks after inactivity and clears the in-memory key/state references on lock or unload.
-- Backups contain only the encrypted vault envelope, never plaintext financial data.
+- The vault passphrase is never persisted by the application.
+- The derived finance `CryptoKey` is non-extractable and exists only in page memory while the vault is unlocked.
+- Decrypted finance JSON is kept only in page memory.
+- The app locks after inactivity and clears in-memory finance key/state references on lock or unload.
+- Encrypted backups contain the encrypted vault envelope, never plaintext financial data.
 
-The vault envelope contains ciphertext plus the non-secret KDF/cipher parameters needed for decryption: salt, IV, algorithm identifiers, iteration count, and format version.
+The vault envelope contains ciphertext plus non-secret KDF/cipher parameters required for decryption: salt, IV, algorithm identifiers, iteration count and format version.
 
-## Data the application must never request
+## Device-sync authorization
 
-Do not add UI that asks users for:
+The synchronization authorization token is separate from the vault passphrase.
 
-- online banking username or password
-- one-time passcodes or MFA recovery codes
-- debit/credit card numbers
-- full bank account or routing numbers
-- Social Security numbers or tax IDs
-- brokerage or crypto private keys / seed phrases
+- A random 256-bit sync token identifies trusted devices to the relay.
+- The relay persists only a SHA-256 hash of that token.
+- Each browser stores its copy of the sync token encrypted under a separate non-extractable AES-GCM device key stored through IndexedDB structured cloning.
+- The sync token is not capable of decrypting the finance vault. It only authorizes encrypted relay reads/writes.
 
-Display names such as `Checking`, `401(k)`, or `Mortgage` and user-entered balances are sufficient for this local planner.
+A stolen sync token can read or replace the encrypted ciphertext and therefore can cause confidentiality metadata exposure or denial/corruption risk, but it still cannot decrypt the finance data without the separate vault passphrase. Protecting the sync token remains important.
 
-## Dedicated-origin launch requirement
+## QR pairing design
 
-`/finance/` inside the main ShareCapsule origin is suitable for development and review, but a production finance product should be served from a dedicated origin such as:
+The QR is generated locally; no third-party QR service is used.
 
-`https://finance.sharecapsule.app/`
+The QR URL fragment contains only:
 
-A separate origin reduces the blast radius of an unrelated same-origin ShareCapsule vulnerability and gives the finance application an independent browser storage namespace.
+- an opaque random vault identifier
+- a one-time pairing identifier
+- a random one-time pairing secret
 
-The dedicated origin should not host unrelated content, third-party widgets, ad scripts, analytics, tag managers, or user-generated executable content.
+It does **not** contain:
 
-## Required production response headers
+- the vault passphrase
+- transactions
+- balances
+- debt information
+- budgets/goals
+- bank credentials
+- card/account numbers
 
-The production finance origin should set security policy in HTTP response headers rather than relying only on an HTML meta tag. At minimum review and deploy:
+The one-time pairing secret is used locally to unwrap the persistent sync authorization token. The relay stores a hash of the pairing secret, the wrapped token, and an expiration timestamp. Claiming the pairing atomically deletes the pairing record.
+
+Because the pairing capability grants access to the encrypted sync channel, users should keep an active QR private even though it cannot decrypt the vault by itself.
+
+## Sync relay storage
+
+The D1 sync database stores only:
+
+- opaque vault ID
+- hash of the sync authorization token
+- AES-GCM encrypted vault envelope/ciphertext
+- revision number
+- opaque device ID associated with the latest write
+- timestamps
+- short-lived pairing records
+
+The relay does not store the vault passphrase or decrypted finance JSON.
+
+## Conflict protection
+
+Every device tracks the last relay revision it has observed. A normal write includes that base revision.
+
+If another device has already changed the vault, the relay returns a conflict instead of silently overwriting a newer revision. The client asks the user whether to keep this device's encrypted version or the other device's encrypted version.
+
+Incoming remote ciphertext is staged separately before replacing the local primary vault, preventing the currently unlocked in-memory planner from silently overwriting a just-downloaded remote version during the apply/reload step.
+
+## Content Security Policy
+
+The application permits outbound connections only to the dedicated sync relay:
 
 ```text
-Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+connect-src 'self' https://sync.finance.sharecapsule.app
+```
+
+The application still loads scripts/styles from itself only and contains no analytics, ads or remote finance SDKs.
+
+Recommended production response headers:
+
+```text
+Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://sync.finance.sharecapsule.app; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Resource-Policy: same-origin
 X-Content-Type-Options: nosniff
@@ -64,34 +115,56 @@ Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
 Cache-Control: no-store
 ```
 
-`style-src 'unsafe-inline'` is currently required because local JavaScript sets progress widths. It does not permit scripts, and the policy still blocks all outbound connection and remote resource channels. A later hardening pass can remove it by replacing dynamic inline style widths with CSP-safe presentation primitives.
+The QR flow deliberately uses the phone's normal Camera application, so the finance web application itself does not require camera permission.
+
+`style-src 'unsafe-inline'` is currently required because the planner sets local progress widths and the sync UI injects presentation styles. It does not permit scripts.
+
+## Data the application must never request
+
+Do not add UI that asks users for:
+
+- online banking username/password
+- one-time passcodes or MFA recovery codes
+- debit/credit card numbers
+- full bank account/routing numbers
+- Social Security numbers or tax IDs
+- brokerage or crypto private keys / seed phrases
+
+Display names such as `Checking`, `401(k)` or `Mortgage` and user-entered balances are sufficient for this planner.
 
 ## Threat model
 
-This architecture is designed to protect financial data from:
+This architecture is designed to reduce risk from:
 
-- accidental server-side collection
-- ShareCapsule database compromise (there is no financial database)
-- network-side inspection of financial values (they are not sent)
+- accidental plaintext server-side collection
+- a sync-database compromise exposing readable financial records
+- third-party analytics/advertising exfiltration
+- passive network inspection of plaintext financial values
 - casual access to browser storage without the vault passphrase
-- third-party analytics/advertising exfiltration (none are loaded)
+- silent last-writer-wins corruption when two devices edit concurrently
+- reuse of a QR pairing record after it has been claimed
 
-It cannot guarantee confidentiality on a compromised device. Malware, a malicious browser extension with page access, a compromised browser, screen capture, keylogging, or hostile software running with sufficient device privileges can still expose data while the vault is unlocked.
+It cannot guarantee confidentiality on a compromised endpoint. Malware, a malicious browser extension with page access, a compromised browser, screen capture, keylogging or hostile software with sufficient device privileges can expose data while the vault is unlocked.
 
-## Security review before production
+A compromised sync authorization token can also access/replace encrypted ciphertext even though it cannot decrypt it. Future work should add per-device asymmetric credentials and individual device revocation rather than one shared vault sync capability.
 
-Before calling this production-ready:
+## Security review before production sync
 
-1. Serve the feature from the dedicated finance origin.
-2. Set and verify the HTTP security headers above.
-3. Run a dependency review (the current app intentionally has no runtime third-party dependencies).
-4. Run static analysis and browser security tests.
-5. Test vault creation, lock/unlock, wrong-passphrase behavior, backup/restore, corrupted backups, private browsing, storage eviction, and multi-tab behavior.
-6. Test XSS injection attempts against every user-controlled text field and CSV import.
-7. Confirm the browser devtools Network panel shows no finance-data network traffic.
-8. Confirm IndexedDB contains ciphertext only.
-9. Arrange an independent security review before promoting the product for real-world financial use.
+Before enabling real-user multi-device sync:
+
+1. Deploy the relay only at `https://sync.finance.sharecapsule.app`.
+2. Apply the D1 schema and verify no plaintext finance fields exist server-side.
+3. Add Cloudflare rate limiting and abuse controls.
+4. Ensure logs never record Authorization headers, QR fragments, request bodies or encrypted payloads unnecessarily.
+5. Test pairing expiration, one-time consumption and replay attempts.
+6. Test malformed vault/pairing payloads and size limits.
+7. Test wrong sync tokens and wrong vault passphrases.
+8. Test concurrent edits and conflict resolution.
+9. Test network loss during upload/download.
+10. Confirm browser IndexedDB contains ciphertext for finance state and locally protected sync authorization material.
+11. Verify the Network panel never sends decrypted financial JSON.
+12. Obtain an independent security review before promoting sync for real financial use.
 
 ## Reference guidance used for the design
 
-The implementation follows the browser cryptography primitives defined by the W3C Web Cryptography API and uses AES-GCM authenticated encryption. The PBKDF2 work factor is aligned with current OWASP Password Storage Cheat Sheet guidance for PBKDF2-HMAC-SHA-256. OWASP client-side storage guidance is also why plaintext financial information is never written to LocalStorage, SessionStorage, or IndexedDB.
+The finance vault uses browser cryptography primitives from the Web Cryptography API, with AES-GCM authenticated encryption and PBKDF2-HMAC-SHA-256 for passphrase derivation. The client intentionally does not persist plaintext finance state in LocalStorage, SessionStorage or IndexedDB.

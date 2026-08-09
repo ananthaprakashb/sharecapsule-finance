@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
-  <meta name="description" content="A privacy-first personal finance workspace. Your financial data stays encrypted on your device and is never sent to ShareCapsule.">
+  <meta name="description" content="A privacy-first personal finance workspace. Financial data is encrypted on your device; optional device sync transfers encrypted vault ciphertext only.">
   <meta name="robots" content="index,follow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://sync.finance.sharecapsule.app; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
   <meta name="referrer" content="no-referrer">
   <title>Private Finance Planner — ShareCapsule</title>
   <link rel="stylesheet" href="./styles.css">
@@ -33,11 +33,11 @@
         <div class="gate-copy">
           <p class="eyebrow">Private finance by ShareCapsule</p>
           <h1>Your money.<br>Your device.<br>Your control.</h1>
-          <p class="lead">Plan income, spending, debt, savings and goals without giving ShareCapsule your financial data. The vault is encrypted in your browser before it is stored on this device.</p>
+          <p class="lead">Plan income, spending, debt, savings and goals without giving ShareCapsule readable financial data. The vault is encrypted in your browser before it is stored or optionally synchronized.</p>
           <div class="trust-grid" aria-label="Privacy guarantees">
-            <div class="trust-card"><strong>Zero cloud finance data</strong><span>No transaction, balance or goal data is sent to our servers.</span></div>
-            <div class="trust-card"><strong>AES-GCM encrypted vault</strong><span>Your local vault is unreadable without your passphrase.</span></div>
-            <div class="trust-card"><strong>No trackers</strong><span>No analytics, ads, third-party scripts or financial-data APIs.</span></div>
+            <div class="trust-card"><strong>Zero readable cloud finance data</strong><span>Local-only is the default. Optional device sync transports encrypted vault ciphertext that the relay cannot decrypt.</span></div>
+            <div class="trust-card"><strong>AES-GCM encrypted vault</strong><span>Your vault is unreadable without your passphrase.</span></div>
+            <div class="trust-card"><strong>No trackers</strong><span>No analytics, ads, third-party scripts or financial-data aggregation SDKs.</span></div>
             <div class="trust-card"><strong>You own the backup</strong><span>Export an encrypted backup file whenever you want.</span></div>
           </div>
         </div>
@@ -227,10 +227,10 @@
         </section>
 
         <section class="view" data-view-panel="privacy">
-          <div class="section-title"><div><p class="eyebrow">Security center</p><h2>Your privacy controls</h2><p class="muted">Financial information should be treated as highly sensitive. These controls keep the default architecture local-first.</p></div></div>
+          <div class="section-title"><div><p class="eyebrow">Security center</p><h2>Your privacy controls</h2><p class="muted">Financial information should be treated as highly sensitive. Local-only remains the default; encrypted sync is optional.</p></div></div>
           <div class="privacy-grid">
             <article class="panel"><h3>Encrypted storage</h3><p>The vault is encrypted with AES-GCM. The encryption key is derived from your passphrase using PBKDF2-HMAC-SHA-256 with a unique random salt. Only encrypted ciphertext, salt and initialization vector are persisted.</p></article>
-            <article class="panel"><h3>No outbound finance requests</h3><p>This page's Content Security Policy blocks network connections. The app contains no analytics, advertising, bank aggregation, social widgets or remote fonts.</p></article>
+            <article class="panel"><h3>Optional zero-knowledge sync</h3><p>When you enable device sync, the browser can connect only to the dedicated ShareCapsule sync relay. The relay stores encrypted vault ciphertext and cannot decrypt it without your vault passphrase.</p></article>
             <article class="panel"><h3>Automatic lock</h3><p>The decrypted vault is kept only in page memory and automatically locks after inactivity. You can lock it immediately from the header.</p></article>
             <article class="panel"><h3>No credential collection</h3><p>Never enter bank usernames, passwords, card numbers, full account numbers, Social Security numbers or authentication codes here.</p></article>
           </div>
@@ -255,7 +255,7 @@
   <footer class="site-footer">
     <div class="shell footer-inner">
       <span>Private Finance Planner by ShareCapsule</span>
-      <span>Financial data stays on your device.</span>
+      <span>Readable financial data stays on your trusted devices.</span>
     </div>
   </footer>
 
@@ -263,5 +263,7 @@
   <input id="backupFileInput" type="file" accept=".json,application/json" hidden>
 
   <script src="./app.js" defer></script>
+  <script src="./qr.js" defer></script>
+  <script src="./sync.js" defer></script>
 </body>
 </html>
