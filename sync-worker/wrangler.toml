@@ -8,7 +8,7 @@ APP_ORIGIN = "https://finance.sharecapsule.app"
 [[d1_databases]]
 binding = "DB"
 database_name = "sharecapsule-finance-sync"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "e1b6c7c3-8566-41af-9936-f02568067b42"
 migrations_dir = "migrations"
 
 [[routes]]
