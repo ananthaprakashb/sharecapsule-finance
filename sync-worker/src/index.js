@@ -172,7 +172,7 @@ async function createPairing(request, env, vaultId, headers) {
 
 async function claimPairing(request, env, vaultId, pairId, headers) {
   const secret = getToken(request, 'Pair');
-  if (!secret || !/^[A-Za-z0-9_-]{22}$/.test(secret)) return json({ error: 'Invalid pairing authorization' }, 401, headers);
+  if (!secret || !/^[A-Za-z0-9_-]{32}$/.test(secret)) return json({ error: 'Invalid pairing authorization' }, 401, headers);
   const secretHash = await sha256Text(secret);
   const now = Date.now();
 
