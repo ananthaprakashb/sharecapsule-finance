@@ -185,7 +185,7 @@
     await pushLocalIfNeeded(config, token, vaultRecord, true);
 
     const pairId = toBase64Url(randomBytes(8));
-    const pairSecretBytes = randomBytes(24);
+    const pairSecretBytes = randomBytes(16);
     const pairSecret = toBase64Url(pairSecretBytes);
     const secretHash = await sha256Text(pairSecret);
     const wrapped = await wrapTokenForPairing(token, pairSecretBytes);
@@ -224,7 +224,7 @@
   }
 
   async function claimPairingFromHash() {
-    const match = location.hash.match(/^#p=([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{11})\.([A-Za-z0-9_-]{32})$/);
+    const match = location.hash.match(/^#p=([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{11})\.([A-Za-z0-9_-]{22})$/);
     if (!match) return false;
     const [, vaultId, pairId, pairSecret] = match;
     showPairingOverlay('Connecting this device…', 'Fetching the encrypted vault. No financial data is readable by the sync relay.');
