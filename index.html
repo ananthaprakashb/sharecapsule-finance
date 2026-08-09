@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1220">
+  <meta name="description" content="A privacy-first personal finance workspace. Your financial data stays encrypted on your device and is never sent to ShareCapsule.">
+  <meta name="robots" content="index,follow">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+  <meta name="referrer" content="no-referrer">
+  <title>Private Finance Planner — ShareCapsule</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <noscript><div class="noscript">This private finance workspace requires JavaScript because encryption and calculations run on your device.</div></noscript>
+
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="/" aria-label="ShareCapsule home">
+        <span class="brand-mark" aria-hidden="true">S</span>
+        <span>ShareCapsule</span>
+      </a>
+      <div class="header-actions">
+        <span class="privacy-pill"><span class="status-dot"></span> Local-only</span>
+        <button class="ghost-button" id="lockButton" type="button" hidden>Lock vault</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="vaultGate" class="gate-section">
+      <div class="shell gate-grid">
+        <div class="gate-copy">
+          <p class="eyebrow">Private finance by ShareCapsule</p>
+          <h1>Your money.<br>Your device.<br>Your control.</h1>
+          <p class="lead">Plan income, spending, debt, savings and goals without giving ShareCapsule your financial data. The vault is encrypted in your browser before it is stored on this device.</p>
+          <div class="trust-grid" aria-label="Privacy guarantees">
+            <div class="trust-card"><strong>Zero cloud finance data</strong><span>No transaction, balance or goal data is sent to our servers.</span></div>
+            <div class="trust-card"><strong>AES-GCM encrypted vault</strong><span>Your local vault is unreadable without your passphrase.</span></div>
+            <div class="trust-card"><strong>No trackers</strong><span>No analytics, ads, third-party scripts or financial-data APIs.</span></div>
+            <div class="trust-card"><strong>You own the backup</strong><span>Export an encrypted backup file whenever you want.</span></div>
+          </div>
+        </div>
+
+        <div class="vault-card">
+          <div id="newVaultPanel" hidden>
+            <p class="eyebrow">First time on this device</p>
+            <h2>Create your private vault</h2>
+            <p class="muted">Choose a strong passphrase. It never leaves this page and cannot be recovered by ShareCapsule.</p>
+            <form id="createVaultForm" autocomplete="off">
+              <label class="field">
+                <span>Vault passphrase</span>
+                <input id="newPassphrase" type="password" minlength="12" autocomplete="off" spellcheck="false" required placeholder="12+ characters">
+              </label>
+              <label class="field">
+                <span>Confirm passphrase</span>
+                <input id="confirmPassphrase" type="password" minlength="12" autocomplete="off" spellcheck="false" required placeholder="Re-enter passphrase">
+              </label>
+              <p class="form-error" id="createError" role="alert"></p>
+              <button class="primary-button wide" type="submit">Create encrypted vault</button>
+            </form>
+            <button class="text-button" id="importBackupAtGate" type="button">Import an encrypted backup instead</button>
+          </div>
+
+          <div id="unlockVaultPanel" hidden>
+            <p class="eyebrow">Encrypted vault found</p>
+            <h2>Unlock your finances</h2>
+            <p class="muted">Decryption happens only in this browser tab. Your passphrase is never stored.</p>
+            <form id="unlockVaultForm" autocomplete="off">
+              <label class="field">
+                <span>Vault passphrase</span>
+                <input id="unlockPassphrase" type="password" autocomplete="off" spellcheck="false" required autofocus>
+              </label>
+              <p class="form-error" id="unlockError" role="alert"></p>
+              <button class="primary-button wide" type="submit">Unlock vault</button>
+            </form>
+            <div class="gate-links">
+              <button class="text-button" id="importBackupUnlock" type="button">Restore encrypted backup</button>
+              <button class="danger-link" id="resetVaultButton" type="button">Erase local vault</button>
+            </div>
+          </div>
+
+          <div class="vault-note">
+            <strong>Important</strong>
+            <span>If you lose the passphrase, the encrypted data cannot be recovered. Keep an encrypted backup in a secure location.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="app" class="app-shell" hidden>
+      <div class="shell">
+        <section class="app-hero">
+          <div>
+            <p class="eyebrow">Private financial command center</p>
+            <h1>See the whole picture.</h1>
+            <p class="lead small">Everything below is calculated locally from the information you choose to enter.</p>
+          </div>
+          <div class="save-state" id="saveState">Vault unlocked</div>
+        </section>
+
+        <nav class="section-nav" aria-label="Finance sections">
+          <button class="nav-tab active" data-view="dashboard" type="button">Overview</button>
+          <button class="nav-tab" data-view="transactions" type="button">Cash flow</button>
+          <button class="nav-tab" data-view="budget" type="button">Budget</button>
+          <button class="nav-tab" data-view="balance" type="button">Net worth</button>
+          <button class="nav-tab" data-view="debt" type="button">Debt</button>
+          <button class="nav-tab" data-view="goals" type="button">Goals</button>
+          <button class="nav-tab" data-view="planner" type="button">Planner</button>
+          <button class="nav-tab" data-view="privacy" type="button">Privacy</button>
+        </nav>
+
+        <section class="view active" data-view-panel="dashboard">
+          <div class="metric-grid" id="metricGrid"></div>
+          <div class="two-column">
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">This month</p><h2>Cash flow</h2></div><span class="panel-kicker" id="monthLabel"></span></div>
+              <div class="cashflow-visual" id="cashflowVisual"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">Planner signal</p><h2>What needs attention</h2></div></div>
+              <div id="attentionList" class="attention-list"></div>
+            </article>
+          </div>
+          <article class="panel">
+            <div class="panel-heading"><div><p class="eyebrow">Forward view</p><h2>12-month cash projection</h2></div><span class="panel-kicker">Based on current monthly income and expenses</span></div>
+            <div class="projection" id="projection"></div>
+          </article>
+        </section>
+
+        <section class="view" data-view-panel="transactions">
+          <div class="section-title"><div><p class="eyebrow">Money in / money out</p><h2>Cash flow</h2><p class="muted">Add transactions manually or import a CSV. Files are parsed on this device.</p></div><button class="secondary-button" id="importCsvButton" type="button">Import CSV</button></div>
+          <div class="two-column form-layout">
+            <article class="panel">
+              <h3>Add transaction</h3>
+              <form id="transactionForm" class="form-grid">
+                <label class="field"><span>Date</span><input id="transactionDate" type="date" required></label>
+                <label class="field"><span>Type</span><select id="transactionType"><option value="expense">Expense</option><option value="income">Income</option></select></label>
+                <label class="field span-2"><span>Description</span><input id="transactionDescription" maxlength="80" required placeholder="Payroll, groceries, rent…"></label>
+                <label class="field"><span>Amount</span><input id="transactionAmount" type="number" min="0.01" step="0.01" required placeholder="0.00"></label>
+                <label class="field"><span>Category</span><input id="transactionCategory" list="categoryList" maxlength="40" required placeholder="Housing"></label>
+                <button class="primary-button span-2" type="submit">Add transaction</button>
+              </form>
+              <datalist id="categoryList">
+                <option value="Income"><option value="Housing"><option value="Utilities"><option value="Groceries"><option value="Dining"><option value="Transportation"><option value="Insurance"><option value="Healthcare"><option value="Education"><option value="Entertainment"><option value="Shopping"><option value="Travel"><option value="Savings"><option value="Other">
+              </datalist>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><h3>Recent transactions</h3></div><button class="text-button" id="clearTransactions" type="button">Clear all</button></div>
+              <div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="number">Amount</th><th></th></tr></thead><tbody id="transactionRows"></tbody></table></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="budget">
+          <div class="section-title"><div><p class="eyebrow">Give every dollar a job</p><h2>Monthly budget</h2><p class="muted">Set category targets and compare them with this month's actual spending.</p></div></div>
+          <div class="two-column form-layout">
+            <article class="panel">
+              <h3>Add budget category</h3>
+              <form id="budgetForm" class="form-grid">
+                <label class="field"><span>Category</span><input id="budgetCategory" maxlength="40" required placeholder="Groceries"></label>
+                <label class="field"><span>Monthly target</span><input id="budgetAmount" type="number" min="0" step="0.01" required placeholder="500"></label>
+                <button class="primary-button span-2" type="submit">Save budget</button>
+              </form>
+            </article>
+            <article class="panel"><div id="budgetList" class="stack-list"></div></article>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="balance">
+          <div class="section-title"><div><p class="eyebrow">What you own</p><h2>Assets & net worth</h2><p class="muted">Track balances manually. Do not enter account numbers, login credentials or other bank secrets.</p></div></div>
+          <div class="two-column form-layout">
+            <article class="panel">
+              <h3>Add asset</h3>
+              <form id="accountForm" class="form-grid">
+                <label class="field"><span>Name</span><input id="accountName" maxlength="50" required placeholder="Checking"></label>
+                <label class="field"><span>Type</span><select id="accountType"><option>Cash</option><option>Investment</option><option>Retirement</option><option>Property</option><option>Other asset</option></select></label>
+                <label class="field span-2"><span>Current value</span><input id="accountBalance" type="number" min="0" step="0.01" required placeholder="0.00"></label>
+                <button class="primary-button span-2" type="submit">Add asset</button>
+              </form>
+            </article>
+            <article class="panel"><div id="accountList" class="stack-list"></div></article>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="debt">
+          <div class="section-title"><div><p class="eyebrow">Reduce interest drag</p><h2>Debt payoff</h2><p class="muted">The planner ranks debt by APR for an avalanche-style payoff view.</p></div></div>
+          <div class="two-column form-layout">
+            <article class="panel">
+              <h3>Add debt</h3>
+              <form id="debtForm" class="form-grid">
+                <label class="field"><span>Name</span><input id="debtName" maxlength="50" required placeholder="Credit card"></label>
+                <label class="field"><span>Balance</span><input id="debtBalance" type="number" min="0" step="0.01" required placeholder="0.00"></label>
+                <label class="field"><span>APR %</span><input id="debtApr" type="number" min="0" max="100" step="0.01" required placeholder="19.99"></label>
+                <label class="field"><span>Minimum payment</span><input id="debtMinimum" type="number" min="0" step="0.01" required placeholder="100"></label>
+                <button class="primary-button span-2" type="submit">Add debt</button>
+              </form>
+            </article>
+            <article class="panel"><div id="debtList" class="stack-list"></div></article>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="goals">
+          <div class="section-title"><div><p class="eyebrow">Turn intentions into numbers</p><h2>Savings goals</h2><p class="muted">Set a target and a monthly contribution to estimate your path.</p></div></div>
+          <div class="two-column form-layout">
+            <article class="panel">
+              <h3>Add goal</h3>
+              <form id="goalForm" class="form-grid">
+                <label class="field"><span>Goal</span><input id="goalName" maxlength="60" required placeholder="Emergency fund"></label>
+                <label class="field"><span>Target</span><input id="goalTarget" type="number" min="1" step="0.01" required placeholder="25000"></label>
+                <label class="field"><span>Already saved</span><input id="goalCurrent" type="number" min="0" step="0.01" required placeholder="5000"></label>
+                <label class="field"><span>Monthly contribution</span><input id="goalMonthly" type="number" min="0" step="0.01" required placeholder="500"></label>
+                <button class="primary-button span-2" type="submit">Add goal</button>
+              </form>
+            </article>
+            <article class="panel"><div id="goalList" class="stack-list"></div></article>
+          </div>
+        </section>
+
+        <section class="view" data-view-panel="planner">
+          <div class="section-title"><div><p class="eyebrow">Deterministic, local guidance</p><h2>Your financial action plan</h2><p class="muted">This planner uses transparent rules and your local numbers. No financial data is sent to an AI service.</p></div><button class="secondary-button" id="refreshPlan" type="button">Refresh plan</button></div>
+          <div class="planner-grid" id="plannerCards"></div>
+          <article class="panel education-note">
+            <h3>Planning guardrail</h3>
+            <p>This tool is for education and personal organization. It does not know your complete tax, legal, insurance, investment or family situation and is not a substitute for a qualified professional when a decision has significant consequences.</p>
+          </article>
+        </section>
+
+        <section class="view" data-view-panel="privacy">
+          <div class="section-title"><div><p class="eyebrow">Security center</p><h2>Your privacy controls</h2><p class="muted">Financial information should be treated as highly sensitive. These controls keep the default architecture local-first.</p></div></div>
+          <div class="privacy-grid">
+            <article class="panel"><h3>Encrypted storage</h3><p>The vault is encrypted with AES-GCM. The encryption key is derived from your passphrase using PBKDF2-HMAC-SHA-256 with a unique random salt. Only encrypted ciphertext, salt and initialization vector are persisted.</p></article>
+            <article class="panel"><h3>No outbound finance requests</h3><p>This page's Content Security Policy blocks network connections. The app contains no analytics, advertising, bank aggregation, social widgets or remote fonts.</p></article>
+            <article class="panel"><h3>Automatic lock</h3><p>The decrypted vault is kept only in page memory and automatically locks after inactivity. You can lock it immediately from the header.</p></article>
+            <article class="panel"><h3>No credential collection</h3><p>Never enter bank usernames, passwords, card numbers, full account numbers, Social Security numbers or authentication codes here.</p></article>
+          </div>
+          <div class="two-column form-layout">
+            <article class="panel">
+              <h3>Encrypted backup</h3>
+              <p class="muted">Download the encrypted vault exactly as stored on this device. The same passphrase is required to restore it.</p>
+              <button class="primary-button" id="exportBackupButton" type="button">Download encrypted backup</button>
+              <button class="secondary-button" id="importBackupButton" type="button">Restore encrypted backup</button>
+            </article>
+            <article class="panel danger-zone">
+              <h3>Erase this device</h3>
+              <p class="muted">Permanently remove the local encrypted vault from this browser.</p>
+              <button class="danger-button" id="eraseVaultButton" type="button">Erase local financial vault</button>
+            </article>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-inner">
+      <span>Private Finance Planner by ShareCapsule</span>
+      <span>Financial data stays on your device.</span>
+    </div>
+  </footer>
+
+  <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden>
+  <input id="backupFileInput" type="file" accept=".json,application/json" hidden>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
