@@ -21,6 +21,7 @@
   let syncBusy = false;
 
   const $ = (id) => document.getElementById(id);
+  const bridge = () => window.ShareCapsuleFinanceSyncBridge || null;
 
   function randomBytes(length) {
     const bytes = new Uint8Array(length);
@@ -100,21 +101,14 @@
   async function revealToken(config) {
     const keyRecord = await dbGet(DEVICE_KEY_ID);
     if (!keyRecord?.key) throw new Error('This device lost its sync protection key. Disconnect and pair it again.');
-    const plaintext = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: fromBase64Url(config.tokenIv) },
-      keyRecord.key,
-      fromBase64Url(config.protectedToken)
-    );
+    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromBase64Url(config.tokenIv) }, keyRecord.key, fromBase64Url(config.protectedToken));
     return decoder.decode(plaintext);
   }
 
   async function api(path, options = {}) {
     const response = await fetch(`${SYNC_ENDPOINT}${path}`, {
       method: options.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.authorization ? { Authorization: options.authorization } : {})
-      },
+      headers: { 'Content-Type': 'application/json', ...(options.authorization ? { Authorization: options.authorization } : {}) },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       cache: 'no-store',
       credentials: 'omit',
@@ -133,11 +127,6 @@
 
   function isVaultRecord(record) {
     return Boolean(record && record.id === VAULT_ID && record.format === 'sharecapsule-private-finance-v1' && typeof record.ciphertext === 'string' && typeof record.iv === 'string' && typeof record.salt === 'string');
-  }
-
-  function localSaveInProgress() {
-    const text = String($('saveState')?.textContent || '');
-    return text.startsWith('Unsaved changes') || text.startsWith('Encrypting');
   }
 
   async function createSyncConfig(vaultRecord) {
@@ -191,6 +180,7 @@
 
   async function createPairing() {
     setDeviceStatus('Preparing a one-time pairing QR…');
+    await bridge()?.flushPendingSave?.();
     const config = await ensureSyncConfig();
     await startPolling();
     const token = await revealToken(config);
@@ -202,7 +192,6 @@
     const pairSecret = toBase64Url(pairSecretBytes);
     const secretHash = await sha256Text(pairSecret);
     const wrapped = await wrapTokenForPairing(token, pairSecretBytes);
-
     const pairing = await api(`/v1/vault/${config.vaultId}/pairings`, {
       method: 'POST',
       authorization: `Bearer ${token}`,
@@ -246,14 +235,10 @@
     try {
       const existingVault = await dbGet(VAULT_ID);
       if (existingVault && !confirm('This browser already has a local finance vault. Pairing will replace that local encrypted vault. Continue?')) {
-        clearPairHash();
-        hidePairingOverlay();
-        return true;
+        clearPairHash(); hidePairingOverlay(); return true;
       }
-
       const claimed = await api(`/v1/pairings/${vaultId}/${pairId}`, { authorization: `Pair ${pairSecret}` });
       if (!isVaultRecord(claimed.payload)) throw new Error('The pairing did not contain a valid encrypted finance vault.');
-
       const syncToken = await unwrapTokenFromPairing(claimed.wrappedToken, claimed.wrapIv, fromBase64Url(pairSecret));
       if (!/^[A-Za-z0-9_-]{43}$/.test(syncToken)) throw new Error('The pairing token could not be verified.');
 
@@ -261,16 +246,8 @@
       const protectedFields = await protectToken(syncToken);
       await dbPut(claimed.payload);
       await dbDelete(PENDING_ID);
-      await dbPut({
-        id: CONFIG_ID,
-        vaultId,
-        deviceId,
-        ...protectedFields,
-        lastRevision: claimed.revision,
-        lastPayloadUpdatedAt: claimed.payload.updatedAt,
-        createdAt: new Date().toISOString(),
-        lastSyncAt: new Date().toISOString()
-      });
+      await dbPut({ id: CONFIG_ID, vaultId, deviceId, ...protectedFields, lastRevision: claimed.revision, lastPayloadUpdatedAt: claimed.payload.updatedAt, createdAt: new Date().toISOString(), lastSyncAt: new Date().toISOString() });
+      await bridge()?.applyRemoteRecord?.(claimed.payload);
 
       clearPairHash();
       showPairingOverlay('Device connected', 'The encrypted vault is now on this device. Unlock it with the same vault passphrase used on your first device.');
@@ -292,13 +269,8 @@
     }
   }
 
-  function clearPairHash() {
-    history.replaceState(null, '', `${location.pathname}${location.search}`);
-  }
-
-  async function pullRemote(config, token) {
-    return api(`/v1/vault/${config.vaultId}`, { authorization: `Bearer ${token}` });
-  }
+  function clearPairHash() { history.replaceState(null, '', `${location.pathname}${location.search}`); }
+  async function pullRemote(config, token) { return api(`/v1/vault/${config.vaultId}`, { authorization: `Bearer ${token}` }); }
 
   async function pushLocalIfNeeded(config, token, vaultRecord, force = false) {
     const result = await api(`/v1/vault/${config.vaultId}`, {
@@ -313,15 +285,33 @@
     return result;
   }
 
-  async function queueRemote(config, remote, vaultRecord) {
+  async function applyRemoteVersion(config, remote) {
     if (!isVaultRecord(remote.payload)) throw new Error('Sync relay returned an invalid encrypted vault.');
+    await dbPut(remote.payload);
+    const result = await bridge()?.applyRemoteRecord?.(remote.payload);
+    config.lastRevision = remote.revision;
+    config.lastPayloadUpdatedAt = remote.payload.updatedAt;
+    config.lastSyncAt = new Date().toISOString();
+    await dbPut(config);
+    await dbDelete(PENDING_ID);
+    hideGlobalNotice();
+    if ($('syncIncomingNotice')) $('syncIncomingNotice').hidden = true;
+    setDeviceStatus(result?.unlocked ? 'Changes from the other device were applied.' : 'Encrypted changes were applied and will be visible when the vault is unlocked.');
+    await renderDeviceState();
+    return Boolean(result?.applied);
+  }
+
+  async function queueRemote(config, remote, vaultRecord) {
+    if (bridge()?.applyRemoteRecord) {
+      await applyRemoteVersion(config, remote);
+      return;
+    }
     await dbPut({ id: PENDING_ID, remote, localUpdatedAt: vaultRecord.updatedAt });
     config.lastSyncAt = new Date().toISOString();
     await dbPut(config);
     showIncomingNotice();
     showGlobalNotice('incoming', 'New encrypted changes arrived from another device.', 'Apply & refresh');
     setDeviceStatus('New encrypted changes are ready to apply.');
-    if ($('app')?.hidden) await applyIncomingChanges();
   }
 
   async function syncNow({ silent = false } = {}) {
@@ -330,15 +320,18 @@
     try {
       const config = await dbGet(CONFIG_ID);
       if (!config) return;
+
+      await bridge()?.flushPendingSave?.();
+
       const pending = await dbGet(PENDING_ID);
       if (pending) {
-        showIncomingNotice();
-        showGlobalNotice('incoming', 'New encrypted changes are waiting to be applied.', 'Apply & refresh');
-        if (!silent) setDeviceStatus('Incoming encrypted changes are waiting to be applied.');
-        return;
-      }
-      if (localSaveInProgress()) {
-        if (!silent) setDeviceStatus('Waiting for the local encrypted save to finish…');
+        if (bridge()?.applyRemoteRecord) {
+          await applyIncomingChanges();
+        } else {
+          showIncomingNotice();
+          showGlobalNotice('incoming', 'New encrypted changes are waiting to be applied.', 'Apply & refresh');
+          if (!silent) setDeviceStatus('Incoming encrypted changes are waiting to be applied.');
+        }
         return;
       }
 
@@ -361,13 +354,12 @@
 
       if (remoteChanged) {
         await queueRemote(config, remote, vaultRecord);
-        await renderDeviceState();
         return;
       }
 
       if (localChanged) {
         await pushLocalIfNeeded(config, token, vaultRecord, false);
-        hideGlobalNoticeIfIdle();
+        hideGlobalNotice();
         setDeviceStatus('Encrypted changes synced.');
         await renderDeviceState();
         return;
@@ -375,15 +367,14 @@
 
       config.lastSyncAt = new Date().toISOString();
       await dbPut(config);
-      hideGlobalNoticeIfIdle();
       if (!silent) setDeviceStatus('Everything is encrypted and up to date.');
       await renderDeviceState();
     } catch (error) {
       if (error.status === 409 && error.body) {
         const config = await dbGet(CONFIG_ID);
-        const token = config ? await revealToken(config) : null;
         const local = await dbGet(VAULT_ID);
-        if (config && token && local) {
+        if (config && local) {
+          const token = await revealToken(config);
           activeConflict = { config, token, local, remote: error.body };
           showConflict();
           showGlobalNotice('conflict', 'Both devices changed the vault. Choose which version to keep in Devices.', 'Open Devices');
@@ -399,13 +390,8 @@
     }
   }
 
-  function showIncomingNotice() {
-    if ($('syncIncomingNotice')) $('syncIncomingNotice').hidden = false;
-  }
-
-  function showConflict() {
-    if ($('syncConflict')) $('syncConflict').hidden = false;
-  }
+  function showIncomingNotice() { if ($('syncIncomingNotice')) $('syncIncomingNotice').hidden = false; }
+  function showConflict() { if ($('syncConflict')) $('syncConflict').hidden = false; }
 
   async function resolveConflict(useLocal) {
     if (!activeConflict) return;
@@ -415,13 +401,7 @@
       setDeviceStatus('This device’s encrypted vault was kept and synced.');
       hideGlobalNotice();
     } else {
-      if (!isVaultRecord(conflict.remote.payload)) throw new Error('Remote vault is invalid.');
-      await dbPut({ id: PENDING_ID, remote: conflict.remote, localUpdatedAt: conflict.local.updatedAt });
-      conflict.config.lastSyncAt = new Date().toISOString();
-      await dbPut(conflict.config);
-      setDeviceStatus('Other device’s encrypted vault is ready to apply.');
-      showIncomingNotice();
-      showGlobalNotice('incoming', 'The other device version is ready to apply.', 'Apply & refresh');
+      await applyRemoteVersion(conflict.config, conflict.remote);
     }
     activeConflict = null;
     if ($('syncConflict')) $('syncConflict').hidden = true;
@@ -432,7 +412,7 @@
     const pending = await dbGet(PENDING_ID);
     const config = await dbGet(CONFIG_ID);
     if (!pending?.remote || !config) return;
-    if (!isVaultRecord(pending.remote.payload)) throw new Error('Pending encrypted vault is invalid.');
+    await bridge()?.flushPendingSave?.();
     const current = await dbGet(VAULT_ID);
     if (current?.updatedAt !== pending.localUpdatedAt) {
       const token = await revealToken(config);
@@ -441,6 +421,10 @@
       showConflict();
       showGlobalNotice('conflict', 'Both devices changed the vault. Choose which version to keep in Devices.', 'Open Devices');
       setDeviceStatus('Both devices changed the vault. Choose which version to keep.');
+      return;
+    }
+    if (bridge()?.applyRemoteRecord) {
+      await applyRemoteVersion(config, pending.remote);
       return;
     }
     await dbPut(pending.remote.payload);
@@ -455,14 +439,9 @@
 
   async function disconnectThisDevice() {
     if (!confirm('Disconnect this device from encrypted sync? The local encrypted vault will remain on this device.')) return;
-    await dbDelete(CONFIG_ID);
-    await dbDelete(DEVICE_KEY_ID);
-    await dbDelete(PENDING_ID);
-    clearInterval(pollTimer);
-    pollTimer = null;
-    updatePrivacyPill(false);
-    hideGlobalNotice();
-    await renderDeviceState();
+    await dbDelete(CONFIG_ID); await dbDelete(DEVICE_KEY_ID); await dbDelete(PENDING_ID);
+    clearInterval(pollTimer); pollTimer = null;
+    updatePrivacyPill(false); hideGlobalNotice(); await renderDeviceState();
   }
 
   async function disableSyncEverywhere() {
@@ -471,27 +450,18 @@
     if (!confirm('Disable encrypted sync for every paired device? Existing local vaults remain on each device, but they will stop synchronizing.')) return;
     const token = await revealToken(config);
     await api(`/v1/vault/${config.vaultId}`, { method: 'DELETE', authorization: `Bearer ${token}` });
-    await dbDelete(CONFIG_ID);
-    await dbDelete(DEVICE_KEY_ID);
-    await dbDelete(PENDING_ID);
-    clearInterval(pollTimer);
-    pollTimer = null;
-    updatePrivacyPill(false);
-    hideGlobalNotice();
-    await renderDeviceState();
+    await dbDelete(CONFIG_ID); await dbDelete(DEVICE_KEY_ID); await dbDelete(PENDING_ID);
+    clearInterval(pollTimer); pollTimer = null;
+    updatePrivacyPill(false); hideGlobalNotice(); await renderDeviceState();
     setDeviceStatus('Encrypted sync disabled everywhere.');
   }
 
   function updatePrivacyPill(syncEnabled) {
     const pill = document.querySelector('.privacy-pill');
-    if (!pill) return;
-    pill.innerHTML = `<span class="status-dot"></span>${syncEnabled ? 'Encrypted sync' : 'Local-only'}`;
+    if (pill) pill.innerHTML = `<span class="status-dot"></span>${syncEnabled ? 'Encrypted sync' : 'Local-only'}`;
   }
 
-  function setDeviceStatus(message) {
-    const node = $('deviceSyncStatus');
-    if (node) node.textContent = message;
-  }
+  function setDeviceStatus(message) { const node = $('deviceSyncStatus'); if (node) node.textContent = message; }
 
   async function renderDeviceState(error = '') {
     const config = await dbGet(CONFIG_ID);
@@ -523,14 +493,7 @@
     notice.hidden = false;
   }
 
-  function hideGlobalNotice() {
-    if ($('syncGlobalNotice')) $('syncGlobalNotice').hidden = true;
-  }
-
-  async function hideGlobalNoticeIfIdle() {
-    if (activeConflict || await dbGet(PENDING_ID)) return;
-    hideGlobalNotice();
-  }
+  function hideGlobalNotice() { if ($('syncGlobalNotice')) $('syncGlobalNotice').hidden = true; }
 
   function injectUi() {
     if ($('devicesNavTab')) return;
@@ -538,11 +501,7 @@
     const privacyTab = nav?.querySelector('[data-view="privacy"]');
     if (nav) {
       const button = document.createElement('button');
-      button.className = 'nav-tab';
-      button.dataset.view = 'devices';
-      button.id = 'devicesNavTab';
-      button.type = 'button';
-      button.textContent = 'Devices';
+      button.className = 'nav-tab'; button.dataset.view = 'devices'; button.id = 'devicesNavTab'; button.type = 'button'; button.textContent = 'Devices';
       nav.insertBefore(button, privacyTab || null);
       button.addEventListener('click', activateDevicesView);
     }
@@ -550,11 +509,10 @@
     const shell = document.querySelector('#app > .shell');
     if (!shell) return;
     const section = document.createElement('section');
-    section.className = 'view';
-    section.dataset.viewPanel = 'devices';
+    section.className = 'view'; section.dataset.viewPanel = 'devices';
     section.innerHTML = `
       <div class="section-title"><div><p class="eyebrow">Trusted devices</p><h2>Encrypted device sync</h2><p class="muted">Pair a phone or another computer by scanning a one-time QR. The relay stores encrypted vault ciphertext only; the vault passphrase is never sent.</p></div></div>
-      <div id="syncIncomingNotice" class="sync-alert" hidden><strong>Encrypted changes arrived from another device.</strong><span>Apply them to this browser. Because the unlocked planner keeps decrypted data only in memory, applying a remote vault refreshes the page and asks you to unlock again.</span><div class="sync-actions"><button class="primary-button" id="applyIncomingButton" type="button">Apply & refresh</button></div></div>
+      <div id="syncIncomingNotice" class="sync-alert" hidden><strong>Encrypted changes arrived from another device.</strong><span>They will normally apply automatically when this browser is using the current sync version. The button remains as a fallback.</span><div class="sync-actions"><button class="primary-button" id="applyIncomingButton" type="button">Apply changes</button></div></div>
       <div id="syncConflict" class="sync-alert sync-conflict" hidden><strong>Both devices changed the vault.</strong><span>Choose which encrypted vault should become the current version.</span><div class="sync-actions"><button class="primary-button" id="keepLocalButton" type="button">Keep this device</button><button class="secondary-button" id="keepRemoteButton" type="button">Use other device</button></div></div>
       <div class="privacy-grid sync-summary">
         <article class="panel"><h3>Sync mode</h3><p id="syncModeValue" class="sync-value">This device only</p></article>
@@ -563,24 +521,8 @@
         <article class="panel"><h3>Relay visibility</h3><p class="sync-value">Encrypted ciphertext only</p></article>
       </div>
       <div class="two-column form-layout">
-        <article class="panel">
-          <h3>Connect another device</h3>
-          <p class="muted">Generate the QR on your laptop, then scan it with the normal Camera app on your phone. The QR is single-use and expires after five minutes.</p>
-          <div class="sync-actions"><button class="primary-button" id="addDeviceButton" type="button">Enable sync & add device</button><button class="secondary-button" id="syncNowButton" type="button" hidden>Sync now</button></div>
-          <p id="deviceSyncStatus" class="sync-status">Financial data is stored only on this device.</p>
-          <div id="pairQrPanel" class="pair-panel" hidden>
-            <div class="pair-qr-wrap"><canvas id="pairQrCanvas" aria-label="One-time device pairing QR code"></canvas></div>
-            <strong>Scan with the other device</strong>
-            <p class="muted">The QR contains a short-lived authorization capability, not your passphrase or financial data. Keep it private while it is active.</p>
-            <p id="pairQrExpires" class="pair-expiry"></p>
-            <details><summary>Can't scan?</summary><label class="field"><span>Pairing link</span><input id="pairingFallback" readonly></label><button class="secondary-button" id="copyPairingButton" type="button">Copy pairing link</button></details>
-          </div>
-        </article>
-        <article class="panel danger-zone">
-          <h3>Sync controls</h3>
-          <p class="muted">Disconnect only this browser, or disable the encrypted relay for every paired device. Local encrypted vaults are not erased.</p>
-          <div class="sync-actions vertical"><button class="secondary-button" id="disconnectDeviceButton" type="button" hidden>Disconnect this device</button><button class="danger-button" id="disableSyncButton" type="button" hidden>Disable sync everywhere</button></div>
-        </article>
+        <article class="panel"><h3>Connect another device</h3><p class="muted">Generate the QR on your laptop, then scan it with the normal Camera app on your phone. The QR is single-use and expires after five minutes.</p><div class="sync-actions"><button class="primary-button" id="addDeviceButton" type="button">Enable sync & add device</button><button class="secondary-button" id="syncNowButton" type="button" hidden>Sync now</button></div><p id="deviceSyncStatus" class="sync-status">Financial data is stored only on this device.</p><div id="pairQrPanel" class="pair-panel" hidden><div class="pair-qr-wrap"><canvas id="pairQrCanvas" aria-label="One-time device pairing QR code"></canvas></div><strong>Scan with the other device</strong><p class="muted">The QR contains a short-lived authorization capability, not your passphrase or financial data. Keep it private while it is active.</p><p id="pairQrExpires" class="pair-expiry"></p><details><summary>Can't scan?</summary><label class="field"><span>Pairing link</span><input id="pairingFallback" readonly></label><button class="secondary-button" id="copyPairingButton" type="button">Copy pairing link</button></details></div></article>
+        <article class="panel danger-zone"><h3>Sync controls</h3><p class="muted">Disconnect only this browser, or disable the encrypted relay for every paired device. Local encrypted vaults are not erased.</p><div class="sync-actions vertical"><button class="secondary-button" id="disconnectDeviceButton" type="button" hidden>Disconnect this device</button><button class="danger-button" id="disableSyncButton" type="button" hidden>Disable sync everywhere</button></div></article>
       </div>`;
     const privacyPanel = shell.querySelector('[data-view-panel="privacy"]');
     shell.insertBefore(section, privacyPanel || null);
@@ -590,16 +532,12 @@
     document.head.appendChild(style);
 
     const overlay = document.createElement('div');
-    overlay.id = 'pairingOverlay';
-    overlay.className = 'pair-overlay';
-    overlay.hidden = true;
+    overlay.id = 'pairingOverlay'; overlay.className = 'pair-overlay'; overlay.hidden = true;
     overlay.innerHTML = `<div class="pair-overlay-card"><p class="eyebrow">Trusted device pairing</p><h2 id="pairingOverlayTitle">Connecting…</h2><p id="pairingOverlayMessage"></p><div id="pairingOverlayActions" class="pair-overlay-actions"></div></div>`;
     document.body.appendChild(overlay);
 
     const globalNotice = document.createElement('div');
-    globalNotice.id = 'syncGlobalNotice';
-    globalNotice.className = 'sync-global';
-    globalNotice.hidden = true;
+    globalNotice.id = 'syncGlobalNotice'; globalNotice.className = 'sync-global'; globalNotice.hidden = true;
     globalNotice.innerHTML = `<div><strong>Encrypted device sync</strong><span id="syncGlobalMessage"></span></div><button class="primary-button" id="syncGlobalAction" type="button">Open Devices</button>`;
     document.body.appendChild(globalNotice);
 
@@ -611,56 +549,39 @@
     $('keepRemoteButton').addEventListener('click', () => resolveConflict(false).catch((error) => setDeviceStatus(error.message)));
     $('applyIncomingButton').addEventListener('click', () => applyIncomingChanges().catch((error) => setDeviceStatus(error.message)));
     $('syncGlobalAction').addEventListener('click', async () => {
-      if ($('syncGlobalNotice')?.dataset.mode === 'incoming') await applyIncomingChanges();
-      else activateDevicesView();
+      if ($('syncGlobalNotice')?.dataset.mode === 'incoming') await applyIncomingChanges(); else activateDevicesView();
     });
     $('copyPairingButton').addEventListener('click', async () => {
       await navigator.clipboard.writeText($('pairingFallback').value);
-      $('copyPairingButton').textContent = 'Copied';
-      setTimeout(() => { $('copyPairingButton').textContent = 'Copy pairing link'; }, 1400);
+      $('copyPairingButton').textContent = 'Copied'; setTimeout(() => { $('copyPairingButton').textContent = 'Copy pairing link'; }, 1400);
     });
   }
 
   function activateDevicesView() {
     document.querySelectorAll('.nav-tab').forEach((node) => node.classList.toggle('active', node.dataset.view === 'devices'));
     document.querySelectorAll('[data-view-panel]').forEach((panel) => panel.classList.toggle('active', panel.dataset.viewPanel === 'devices'));
-    renderDeviceState();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    renderDeviceState(); window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function showPairingOverlay(title, message) {
-    const overlay = $('pairingOverlay');
-    if (!overlay) return;
-    $('pairingOverlayTitle').textContent = title;
-    $('pairingOverlayMessage').textContent = message;
-    $('pairingOverlayActions').replaceChildren();
-    overlay.hidden = false;
+    const overlay = $('pairingOverlay'); if (!overlay) return;
+    $('pairingOverlayTitle').textContent = title; $('pairingOverlayMessage').textContent = message; $('pairingOverlayActions').replaceChildren(); overlay.hidden = false;
   }
-
-  function hidePairingOverlay() {
-    if ($('pairingOverlay')) $('pairingOverlay').hidden = true;
-  }
+  function hidePairingOverlay() { if ($('pairingOverlay')) $('pairingOverlay').hidden = true; }
 
   async function startPolling() {
-    clearInterval(pollTimer);
-    pollTimer = null;
-    const config = await dbGet(CONFIG_ID);
-    if (!config) return;
-    pollTimer = setInterval(() => {
-      if (document.visibilityState === 'visible') syncNow({ silent: true }).catch(() => {});
-    }, SYNC_INTERVAL_MS);
+    clearInterval(pollTimer); pollTimer = null;
+    const config = await dbGet(CONFIG_ID); if (!config) return;
+    pollTimer = setInterval(() => { if (document.visibilityState === 'visible') syncNow({ silent: true }).catch(() => {}); }, SYNC_INTERVAL_MS);
   }
 
   function startSaveObserver() {
     saveObserver?.disconnect();
-    const node = $('saveState');
-    if (!node) return;
+    const node = $('saveState'); if (!node) return;
     let previous = node.textContent;
     saveObserver = new MutationObserver(() => {
       const current = node.textContent;
-      if (current !== previous && String(current).startsWith('Encrypted locally')) {
-        setTimeout(() => syncNow({ silent: true }).catch(() => {}), 0);
-      }
+      if (current !== previous && String(current).startsWith('Encrypted locally')) setTimeout(() => syncNow({ silent: true }).catch(() => {}), 0);
       previous = current;
     });
     saveObserver.observe(node, { childList: true, characterData: true, subtree: true });
@@ -674,14 +595,10 @@
     await renderDeviceState();
     await startPolling();
     startSaveObserver();
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') syncNow({ silent: true }).catch(() => {});
-    });
+    window.addEventListener('sharecapsule:finance-vault-saved', () => syncNow({ silent: true }).catch(() => {}));
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncNow({ silent: true }).catch(() => {}); });
     window.addEventListener('online', () => syncNow({ silent: true }).catch(() => {}));
   }
 
-  init().catch((error) => {
-    console.error(error);
-    setDeviceStatus(`Device sync could not start: ${error.message}`);
-  });
+  init().catch((error) => { console.error(error); setDeviceStatus(`Device sync could not start: ${error.message}`); });
 })();
