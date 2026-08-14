@@ -16,6 +16,7 @@
   let state = null;
   let saveTimer = null;
   let lockTimer = null;
+  let dirty = false;
 
   const $ = (id) => document.getElementById(id);
   const qsa = (selector) => [...document.querySelectorAll(selector)];
@@ -45,9 +46,7 @@
   function bytesToBase64(bytes) {
     let binary = '';
     const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-    for (let i = 0; i < view.length; i += 0x8000) {
-      binary += String.fromCharCode(...view.subarray(i, i + 0x8000));
-    }
+    for (let i = 0; i < view.length; i += 0x8000) binary += String.fromCharCode(...view.subarray(i, i + 0x8000));
     return btoa(binary);
   }
 
@@ -127,13 +126,15 @@
     const iterations = Number(record.kdf?.iterations || KDF_ITERATIONS);
     if (!Number.isInteger(iterations) || iterations < 100000 || iterations > 5000000) throw new Error('Unsupported vault parameters');
     const key = await deriveKey(passphrase, salt, iterations);
-    const plaintext = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: base64ToBytes(record.iv) },
-      key,
-      base64ToBytes(record.ciphertext)
-    );
+    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(record.iv) }, key, base64ToBytes(record.ciphertext));
     const parsed = JSON.parse(decoder.decode(plaintext));
     return { key, state: normalizeState(parsed), salt };
+  }
+
+  async function decryptRecordWithCurrentKey(record) {
+    if (!currentKey) throw new Error('Vault is locked');
+    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(record.iv) }, currentKey, base64ToBytes(record.ciphertext));
+    return normalizeState(JSON.parse(decoder.decode(plaintext)));
   }
 
   function normalizeState(value) {
@@ -153,22 +154,28 @@
 
   async function persist() {
     if (!state || !currentKey || !vaultRecord) return;
+    clearTimeout(saveTimer);
+    saveTimer = null;
     setSaveState('Encrypting…');
     try {
       const salt = base64ToBytes(vaultRecord.salt);
       vaultRecord = await encryptState(state, currentKey, salt);
       await dbPut(vaultRecord);
+      dirty = false;
       setSaveState(`Encrypted locally · ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
+      window.dispatchEvent(new CustomEvent('sharecapsule:finance-vault-saved', { detail: { updatedAt: vaultRecord.updatedAt } }));
     } catch (error) {
       console.error(error);
       setSaveState('Could not save locally');
+      throw error;
     }
   }
 
   function scheduleSave() {
     clearTimeout(saveTimer);
+    dirty = true;
     setSaveState('Unsaved changes…');
-    saveTimer = setTimeout(persist, 450);
+    saveTimer = setTimeout(() => persist().catch(() => {}), 450);
   }
 
   function setSaveState(text) {
@@ -200,9 +207,11 @@
 
   function lockVault() {
     clearTimeout(saveTimer);
+    saveTimer = null;
     clearTimeout(lockTimer);
     currentKey = null;
     state = null;
+    dirty = false;
     showGate(true);
   }
 
@@ -280,11 +289,7 @@
     const stats = monthlyStats();
     $('monthLabel').textContent = new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     const max = Math.max(stats.income, stats.expenses, 1);
-    const lines = [
-      ['Income', stats.income, 'income'],
-      ['Expenses', stats.expenses, 'expense'],
-      ['Surplus / deficit', Math.abs(stats.net), stats.net >= 0 ? 'income' : 'expense']
-    ];
+    const lines = [['Income', stats.income, 'income'], ['Expenses', stats.expenses, 'expense'], ['Surplus / deficit', Math.abs(stats.net), stats.net >= 0 ? 'income' : 'expense']];
     $('cashflowVisual').innerHTML = lines.map(([name, value, type]) => `<div class="cash-line"><span class="name">${esc(name)}</span><div class="bar-track"><div class="bar-fill ${type === 'expense' ? 'expense' : ''}" style="width:${clamp((value / max) * 100, 0, 100).toFixed(1)}%"></div></div><span class="amount">${esc(money.format(name === 'Surplus / deficit' ? stats.net : value))}</span></div>`).join('');
   }
 
@@ -329,11 +334,7 @@
   function renderTransactions() {
     const rows = [...state.transactions].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 200);
     $('transactionRows').innerHTML = rows.length ? rows.map((transaction) => `<tr><td>${esc(transaction.date)}</td><td>${esc(transaction.description)}</td><td>${esc(transaction.category)}</td><td class="number">${transaction.type === 'income' ? '+' : '−'}${esc(money2.format(Math.abs(num(transaction.amount))))}</td><td><button class="delete-row" data-delete-transaction="${esc(transaction.id)}" type="button">Remove</button></td></tr>`).join('') : '<tr><td colspan="5"><div class="empty-state">No transactions yet.</div></td></tr>';
-    qsa('[data-delete-transaction]').forEach((button) => button.addEventListener('click', () => {
-      state.transactions = state.transactions.filter((item) => item.id !== button.dataset.deleteTransaction);
-      scheduleSave();
-      renderAll();
-    }));
+    qsa('[data-delete-transaction]').forEach((button) => button.addEventListener('click', () => { state.transactions = state.transactions.filter((item) => item.id !== button.dataset.deleteTransaction); scheduleSave(); renderAll(); }));
   }
 
   function renderBudgets() {
@@ -345,21 +346,13 @@
       const ratio = target > 0 ? spent / target : (spent > 0 ? 2 : 0);
       return `<div class="stack-item"><div class="stack-item-top"><div><h4>${esc(budget.category)}</h4><div class="meta">${esc(money.format(spent))} spent of ${esc(money.format(target))}</div></div><div class="money">${esc(pct.format(ratio))}</div></div><div class="progress-track"><div class="progress-bar ${ratio > 1 ? 'over' : ''}" style="width:${clamp(ratio * 100, 0, 100).toFixed(1)}%"></div></div><div class="stack-actions"><button class="delete-row" data-delete-budget="${esc(budget.id)}" type="button">Remove</button></div></div>`;
     }).join('') : '<div class="empty-state">Add a few monthly spending targets to compare your plan with actual transactions.</div>';
-    qsa('[data-delete-budget]').forEach((button) => button.addEventListener('click', () => {
-      state.budgets = state.budgets.filter((item) => item.id !== button.dataset.deleteBudget);
-      scheduleSave();
-      renderAll();
-    }));
+    qsa('[data-delete-budget]').forEach((button) => button.addEventListener('click', () => { state.budgets = state.budgets.filter((item) => item.id !== button.dataset.deleteBudget); scheduleSave(); renderAll(); }));
   }
 
   function renderAccounts() {
     const items = [...state.accounts].sort((a, b) => num(b.balance) - num(a.balance));
     $('accountList').innerHTML = items.length ? items.map((account) => `<div class="stack-item"><div class="stack-item-top"><div><h4>${esc(account.name)}</h4><div class="meta">${esc(account.type)}</div></div><div class="money">${esc(money2.format(Math.max(0, num(account.balance))))}</div></div><div class="stack-actions"><button class="delete-row" data-delete-account="${esc(account.id)}" type="button">Remove</button></div></div>`).join('') : '<div class="empty-state">Add cash, investments, retirement balances, property and other assets.</div>';
-    qsa('[data-delete-account]').forEach((button) => button.addEventListener('click', () => {
-      state.accounts = state.accounts.filter((item) => item.id !== button.dataset.deleteAccount);
-      scheduleSave();
-      renderAll();
-    }));
+    qsa('[data-delete-account]').forEach((button) => button.addEventListener('click', () => { state.accounts = state.accounts.filter((item) => item.id !== button.dataset.deleteAccount); scheduleSave(); renderAll(); }));
   }
 
   function renderDebts() {
@@ -368,11 +361,7 @@
       const interest = Math.max(0, num(debt.balance)) * Math.max(0, num(debt.apr)) / 100 / 12;
       return `<div class="stack-item"><div class="stack-item-top"><div><h4>${index === 0 ? 'Payoff priority · ' : ''}${esc(debt.name)}</h4><div class="meta">${esc(num(debt.apr).toFixed(2))}% APR · ${esc(money2.format(num(debt.minimum)))} minimum · about ${esc(money2.format(interest))}/mo simple interest at current balance</div></div><div class="money">${esc(money2.format(Math.max(0, num(debt.balance))))}</div></div><div class="stack-actions"><button class="delete-row" data-delete-debt="${esc(debt.id)}" type="button">Remove</button></div></div>`;
     }).join('') : '<div class="empty-state">No debt entered. If you carry debt, add the balance, APR and minimum payment.</div>';
-    qsa('[data-delete-debt]').forEach((button) => button.addEventListener('click', () => {
-      state.debts = state.debts.filter((item) => item.id !== button.dataset.deleteDebt);
-      scheduleSave();
-      renderAll();
-    }));
+    qsa('[data-delete-debt]').forEach((button) => button.addEventListener('click', () => { state.debts = state.debts.filter((item) => item.id !== button.dataset.deleteDebt); scheduleSave(); renderAll(); }));
   }
 
   function renderGoals() {
@@ -386,11 +375,7 @@
       const timeline = months === 0 ? 'Goal funded' : Number.isFinite(months) ? `About ${months} month${months === 1 ? '' : 's'} at current contribution` : 'Add a monthly contribution to estimate timing';
       return `<div class="stack-item"><div class="stack-item-top"><div><h4>${esc(goal.name)}</h4><div class="meta">${esc(timeline)}</div></div><div class="money">${esc(money.format(current))} / ${esc(money.format(target))}</div></div><div class="progress-track"><div class="progress-bar" style="width:${clamp((current / target) * 100, 0, 100).toFixed(1)}%"></div></div><div class="stack-actions"><button class="delete-row" data-delete-goal="${esc(goal.id)}" type="button">Remove</button></div></div>`;
     }).join('') : '<div class="empty-state">Add an emergency fund, home, education, travel or other savings goal.</div>';
-    qsa('[data-delete-goal]').forEach((button) => button.addEventListener('click', () => {
-      state.goals = state.goals.filter((item) => item.id !== button.dataset.deleteGoal);
-      scheduleSave();
-      renderAll();
-    }));
+    qsa('[data-delete-goal]').forEach((button) => button.addEventListener('click', () => { state.goals = state.goals.filter((item) => item.id !== button.dataset.deleteGoal); scheduleSave(); renderAll(); }));
   }
 
   function buildPlan() {
@@ -401,13 +386,9 @@
     const runway = monthly.expenses > 0 ? balances.cash / monthly.expenses : null;
     const targetMonths = state.settings.emergencyFundTargetMonths || 6;
 
-    if (monthly.net < 0) {
-      cards.push({ priority: 'Priority 1', title: 'Stop the monthly deficit', body: `Your tracked month is running ${money.format(Math.abs(monthly.net))} negative. A sustainable plan starts by bringing recurring outflow below recurring income.`, action: 'Review fixed bills first, then the largest flexible categories.' });
-    } else if (monthly.income > 0) {
-      cards.push({ priority: 'Foundation', title: 'Protect your positive cash flow', body: `Your tracked monthly surplus is ${money.format(monthly.net)}. Treat that surplus as a resource to assign intentionally rather than letting it disappear.`, action: 'Direct surplus toward reserves, high-cost debt and named goals.' });
-    } else {
-      cards.push({ priority: 'Start here', title: 'Complete one month of cash flow', body: 'The planner needs recurring income and spending to estimate savings rate, reserve coverage and a useful forward view.', action: 'Add recent income and expenses in Cash flow.' });
-    }
+    if (monthly.net < 0) cards.push({ priority: 'Priority 1', title: 'Stop the monthly deficit', body: `Your tracked month is running ${money.format(Math.abs(monthly.net))} negative. A sustainable plan starts by bringing recurring outflow below recurring income.`, action: 'Review fixed bills first, then the largest flexible categories.' });
+    else if (monthly.income > 0) cards.push({ priority: 'Foundation', title: 'Protect your positive cash flow', body: `Your tracked monthly surplus is ${money.format(monthly.net)}. Treat that surplus as a resource to assign intentionally rather than letting it disappear.`, action: 'Direct surplus toward reserves, high-cost debt and named goals.' });
+    else cards.push({ priority: 'Start here', title: 'Complete one month of cash flow', body: 'The planner needs recurring income and spending to estimate savings rate, reserve coverage and a useful forward view.', action: 'Add recent income and expenses in Cash flow.' });
 
     if (runway !== null) {
       const reserveTarget = monthly.expenses * targetMonths;
@@ -422,20 +403,15 @@
       cards.push({ priority: 'Debt', title: `Highest APR: ${top.name || 'Debt'}`, body: `${num(top.apr).toFixed(2)}% APR on ${money.format(num(top.balance))}. The avalanche method directs extra payoff dollars to the highest APR while maintaining required minimums elsewhere.`, action: `Tracked minimum payments total ${money.format(minimums)} per month. Confirm lender terms before changing payments.` });
     }
 
-    if (savingsRate !== null) {
-      cards.push({ priority: 'Capacity', title: 'Know your savings rate', body: `Based on this month’s tracked income and expenses, your current cash-flow savings rate is ${pct.format(savingsRate)}. This is a planning signal, not a score.`, action: savingsRate < .1 ? 'Look for one recurring expense or income lever that can improve the monthly margin.' : 'Decide how much of the margin belongs to reserves, goals, investing and debt.' });
-    }
+    if (savingsRate !== null) cards.push({ priority: 'Capacity', title: 'Know your savings rate', body: `Based on this month’s tracked income and expenses, your current cash-flow savings rate is ${pct.format(savingsRate)}. This is a planning signal, not a score.`, action: savingsRate < .1 ? 'Look for one recurring expense or income lever that can improve the monthly margin.' : 'Decide how much of the margin belongs to reserves, goals, investing and debt.' });
 
     const monthlyBudget = state.budgets.reduce((sum, item) => sum + Math.max(0, num(item.amount)), 0);
-    if (monthlyBudget > 0 && monthly.income > 0) {
-      cards.push({ priority: 'Budget', title: 'Check planned spending against income', body: `Your category targets total ${money.format(monthlyBudget)} versus ${money.format(monthly.income)} of tracked monthly income.`, action: monthlyBudget > monthly.income ? 'Targets exceed tracked income; review categories before relying on the budget.' : `Unallocated amount before non-budgeted items: ${money.format(monthly.income - monthlyBudget)}.` });
-    }
+    if (monthlyBudget > 0 && monthly.income > 0) cards.push({ priority: 'Budget', title: 'Check planned spending against income', body: `Your category targets total ${money.format(monthlyBudget)} versus ${money.format(monthly.income)} of tracked monthly income.`, action: monthlyBudget > monthly.income ? 'Targets exceed tracked income; review categories before relying on the budget.' : `Unallocated amount before non-budgeted items: ${money.format(monthly.income - monthlyBudget)}.` });
 
     if (state.goals.length) {
       const monthlyGoalContrib = state.goals.reduce((sum, item) => sum + Math.max(0, num(item.monthly)), 0);
       cards.push({ priority: 'Goals', title: 'Fund priorities without double-counting cash', body: `Planned goal contributions total ${money.format(monthlyGoalContrib)} per month. Make sure those contributions fit inside your actual monthly surplus.`, action: monthly.net >= monthlyGoalContrib ? 'Current tracked surplus can cover the entered goal contributions.' : 'Entered goal contributions are above the current tracked monthly surplus.' });
     }
-
     return cards.slice(0, 8);
   }
 
@@ -454,9 +430,36 @@
       const iv = base64ToBytes(record.iv);
       const ciphertext = base64ToBytes(record.ciphertext);
       return salt.length >= 16 && iv.length === 12 && ciphertext.length > 16;
-    } catch {
-      return false;
+    } catch { return false; }
+  }
+
+  async function applyRemoteVaultRecord(record) {
+    if (!validateBackupRecord(record)) throw new Error('Remote encrypted vault is invalid');
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    dirty = false;
+
+    if (currentKey && state) {
+      try {
+        const nextState = await decryptRecordWithCurrentKey(record);
+        vaultRecord = record;
+        state = nextState;
+        renderAll();
+        resetAutoLock();
+        setSaveState(`Synced from trusted device · ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
+        return { applied: true, unlocked: true };
+      } catch (error) {
+        console.error('Could not decrypt incoming vault with the current in-memory key', error);
+        vaultRecord = record;
+        currentKey = null;
+        state = null;
+        showGate(true);
+        return { applied: true, unlocked: false, requiresUnlock: true };
+      }
     }
+
+    vaultRecord = record;
+    return { applied: true, unlocked: false };
   }
 
   async function importBackup(file) {
@@ -467,12 +470,13 @@
     record.id = VAULT_ID;
     await dbPut(record);
     vaultRecord = record;
+    dirty = false;
     lockVault();
     alert('Encrypted backup restored. Unlock it with the passphrase used when the backup was created.');
   }
 
   async function exportBackup() {
-    await persist();
+    if (dirty) await persist();
     const record = await dbGet(VAULT_ID);
     if (!record) return;
     const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' });
@@ -495,9 +499,8 @@
       if (char === '"') {
         if (quoted && line[i + 1] === '"') { value += '"'; i++; }
         else quoted = !quoted;
-      } else if (char === ',' && !quoted) {
-        cells.push(value.trim()); value = '';
-      } else value += char;
+      } else if (char === ',' && !quoted) { cells.push(value.trim()); value = ''; }
+      else value += char;
     }
     cells.push(value.trim());
     return cells;
@@ -549,6 +552,7 @@
         state = defaultState();
         vaultRecord = await encryptState(state, currentKey, salt);
         await dbPut(vaultRecord);
+        dirty = false;
         showApp();
       } catch (error) {
         console.error(error);
@@ -571,6 +575,7 @@
         const result = await decryptRecord(vaultRecord, $('unlockPassphrase').value);
         currentKey = result.key;
         state = result.state;
+        dirty = false;
         showApp();
       } catch (error) {
         console.error(error);
@@ -586,18 +591,10 @@
 
     $('transactionForm').addEventListener('submit', (event) => {
       event.preventDefault();
-      state.transactions.push({
-        id: uid(),
-        date: $('transactionDate').value,
-        type: $('transactionType').value,
-        description: $('transactionDescription').value.trim().slice(0, 80),
-        amount: Math.abs(num($('transactionAmount').value)),
-        category: $('transactionCategory').value.trim().slice(0, 40)
-      });
+      state.transactions.push({ id: uid(), date: $('transactionDate').value, type: $('transactionType').value, description: $('transactionDescription').value.trim().slice(0, 80), amount: Math.abs(num($('transactionAmount').value)), category: $('transactionCategory').value.trim().slice(0, 40) });
       event.currentTarget.reset();
       $('transactionDate').value = nowIsoDate();
-      scheduleSave();
-      renderAll();
+      scheduleSave(); renderAll();
     });
 
     $('budgetForm').addEventListener('submit', (event) => {
@@ -606,33 +603,25 @@
       const existing = state.budgets.find((item) => categoryKey(item.category) === categoryKey(category));
       if (existing) existing.amount = Math.max(0, num($('budgetAmount').value));
       else state.budgets.push({ id: uid(), category, amount: Math.max(0, num($('budgetAmount').value)) });
-      event.currentTarget.reset();
-      scheduleSave();
-      renderAll();
+      event.currentTarget.reset(); scheduleSave(); renderAll();
     });
 
     $('accountForm').addEventListener('submit', (event) => {
       event.preventDefault();
       state.accounts.push({ id: uid(), name: $('accountName').value.trim().slice(0, 50), type: $('accountType').value, balance: Math.max(0, num($('accountBalance').value)) });
-      event.currentTarget.reset();
-      scheduleSave();
-      renderAll();
+      event.currentTarget.reset(); scheduleSave(); renderAll();
     });
 
     $('debtForm').addEventListener('submit', (event) => {
       event.preventDefault();
       state.debts.push({ id: uid(), name: $('debtName').value.trim().slice(0, 50), balance: Math.max(0, num($('debtBalance').value)), apr: clamp(num($('debtApr').value), 0, 100), minimum: Math.max(0, num($('debtMinimum').value)) });
-      event.currentTarget.reset();
-      scheduleSave();
-      renderAll();
+      event.currentTarget.reset(); scheduleSave(); renderAll();
     });
 
     $('goalForm').addEventListener('submit', (event) => {
       event.preventDefault();
       state.goals.push({ id: uid(), name: $('goalName').value.trim().slice(0, 60), target: Math.max(1, num($('goalTarget').value)), current: Math.max(0, num($('goalCurrent').value)), monthly: Math.max(0, num($('goalMonthly').value)) });
-      event.currentTarget.reset();
-      scheduleSave();
-      renderAll();
+      event.currentTarget.reset(); scheduleSave(); renderAll();
     });
   }
 
@@ -643,7 +632,7 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }));
 
-    $('lockButton').addEventListener('click', async () => { await persist(); lockVault(); });
+    $('lockButton').addEventListener('click', async () => { if (dirty) await persist(); lockVault(); });
     $('refreshPlan').addEventListener('click', renderPlanner);
     $('importCsvButton').addEventListener('click', () => $('csvFileInput').click());
     $('exportBackupButton').addEventListener('click', exportBackup);
@@ -652,8 +641,7 @@
     $('importBackupUnlock').addEventListener('click', () => $('backupFileInput').click());
 
     $('csvFileInput').addEventListener('change', async (event) => {
-      try { await importCsv(event.target.files?.[0]); }
-      catch (error) { alert(error.message || 'Could not import CSV.'); }
+      try { await importCsv(event.target.files?.[0]); } catch (error) { alert(error.message || 'Could not import CSV.'); }
       event.target.value = '';
     });
 
@@ -667,20 +655,14 @@
 
     $('clearTransactions').addEventListener('click', () => {
       if (!state.transactions.length) return;
-      if (confirm('Remove all transactions from this encrypted vault?')) {
-        state.transactions = [];
-        scheduleSave();
-        renderAll();
-      }
+      if (confirm('Remove all transactions from this encrypted vault?')) { state.transactions = []; scheduleSave(); renderAll(); }
     });
 
     const erase = async () => {
       if (!confirm('Permanently erase the local encrypted finance vault from this browser? This cannot be undone without an encrypted backup.')) return;
       await dbDelete(VAULT_ID);
-      vaultRecord = null;
-      currentKey = null;
-      state = null;
-      clearTimeout(lockTimer);
+      vaultRecord = null; currentKey = null; state = null; dirty = false;
+      clearTimeout(lockTimer); clearTimeout(saveTimer); saveTimer = null;
       showGate(false);
     };
     $('eraseVaultButton').addEventListener('click', erase);
@@ -692,6 +674,19 @@
     window.addEventListener('beforeunload', () => { currentKey = null; state = null; });
   }
 
+  window.ShareCapsuleFinanceSyncBridge = Object.freeze({
+    async flushPendingSave() {
+      if (dirty && state && currentKey && vaultRecord) await persist();
+      return vaultRecord ? { updatedAt: vaultRecord.updatedAt } : null;
+    },
+    async applyRemoteRecord(record) {
+      return applyRemoteVaultRecord(record);
+    },
+    isUnlocked() {
+      return Boolean(currentKey && state);
+    }
+  });
+
   async function init() {
     if (!window.crypto?.subtle || !window.indexedDB) {
       document.body.innerHTML = '<div class="noscript">This browser does not provide the encryption and local database capabilities required by Private Finance Planner.</div>';
@@ -700,9 +695,7 @@
     try {
       db = await openDb();
       vaultRecord = await dbGet(VAULT_ID);
-      bindForms();
-      bindButtons();
-      bindAutoLock();
+      bindForms(); bindButtons(); bindAutoLock();
       showGate(Boolean(vaultRecord));
     } catch (error) {
       console.error(error);
