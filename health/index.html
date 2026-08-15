@@ -77,13 +77,13 @@
               <input id="householdSize" type="number" min="1" max="20" step="1" inputmode="numeric" placeholder="4">
               <small>Helps explain how closely your household resembles the peer estimate.</small>
             </label>
-            <label class="field">
+            <label class="field" id="vaultPassphraseField">
               <span>Vault passphrase</span>
               <input id="vaultPassphrase" type="password" autocomplete="off" spellcheck="false" required placeholder="Your existing vault passphrase">
-              <small>Used only in browser memory to decrypt the local vault.</small>
+              <small>Needed only when this tab does not already have an active vault session.</small>
             </label>
           </div>
-          <div class="setup-note">The comparison profile is session-only in this version. ShareCapsule does not persist your state, household income, household size, or passphrase from this page.</div>
+          <div class="setup-note" id="healthSessionNote">The comparison profile is session-only in this version. ShareCapsule does not persist your state, household income, household size, or passphrase from this page.</div>
           <p class="error" id="formError" role="alert"></p>
           <button class="primary-button" id="analyzeButton" type="submit">Analyze my financial health</button>
         </form>
@@ -141,7 +141,8 @@
   </main>
 
   <footer class="footer"><div class="shell">Educational planning support only. Peer estimates are not financial advice or required spending limits. · <a href="/privacy/">Privacy</a> · <a href="/methodology/">Methodology</a> · <a href="/sources/">Sources</a></div></footer>
-  <script src="./health.js?v=20260815-3" defer></script>
+  <script src="../vault-session.js?v=20260815-1" defer></script>
+  <script src="./health.js?v=20260815-4" defer></script>
   <script src="./guide-journey.js?v=20260815-1" defer></script>
 </body>
 </html>

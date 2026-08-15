@@ -20,6 +20,7 @@
 
   const $ = (id) => document.getElementById(id);
   const qsa = (selector) => [...document.querySelectorAll(selector)];
+  const vaultSession = () => window.ShareCapsuleVaultSession || null;
   const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
   const money2 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const pct = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 0 });
@@ -93,15 +94,18 @@
     });
   }
 
+  async function deriveKeyMaterial(passphrase, salt, iterations = KDF_ITERATIONS) {
+    const baseKey = await crypto.subtle.importKey('raw', encoder.encode(passphrase), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, baseKey, 256);
+    const rawKey = new Uint8Array(bits);
+    const key = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    return { key, rawKey };
+  }
+
   async function deriveKey(passphrase, salt, iterations = KDF_ITERATIONS) {
-    const baseKey = await crypto.subtle.importKey('raw', encoder.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
-    return crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
-      baseKey,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt']
-    );
+    const material = await deriveKeyMaterial(passphrase, salt, iterations);
+    material.rawKey.fill(0);
+    return material.key;
   }
 
   async function encryptState(data, key, salt) {
@@ -125,10 +129,15 @@
     const salt = base64ToBytes(record.salt);
     const iterations = Number(record.kdf?.iterations || KDF_ITERATIONS);
     if (!Number.isInteger(iterations) || iterations < 100000 || iterations > 5000000) throw new Error('Unsupported vault parameters');
-    const key = await deriveKey(passphrase, salt, iterations);
-    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(record.iv) }, key, base64ToBytes(record.ciphertext));
-    const parsed = JSON.parse(decoder.decode(plaintext));
-    return { key, state: normalizeState(parsed), salt };
+    const material = await deriveKeyMaterial(passphrase, salt, iterations);
+    try {
+      const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(record.iv) }, material.key, base64ToBytes(record.ciphertext));
+      const parsed = JSON.parse(decoder.decode(plaintext));
+      return { key: material.key, rawKey: material.rawKey, state: normalizeState(parsed), salt };
+    } catch (error) {
+      material.rawKey.fill(0);
+      throw error;
+    }
   }
 
   async function decryptRecordWithCurrentKey(record) {
@@ -201,6 +210,7 @@
     $('app').hidden = false;
     $('lockButton').hidden = false;
     $('transactionDate').value = nowIsoDate();
+    vaultSession()?.touch();
     resetAutoLock();
     renderAll();
   }
@@ -212,11 +222,13 @@
     currentKey = null;
     state = null;
     dirty = false;
+    vaultSession()?.clear();
     showGate(true);
   }
 
   function resetAutoLock() {
     if (!currentKey) return;
+    vaultSession()?.touch();
     clearTimeout(lockTimer);
     lockTimer = setTimeout(lockVault, AUTO_LOCK_MS);
   }
@@ -548,11 +560,13 @@
       submit.textContent = 'Creating vault…';
       try {
         const salt = crypto.getRandomValues(new Uint8Array(16));
-        currentKey = await deriveKey(passphrase, salt);
+        const material = await deriveKeyMaterial(passphrase, salt);
+        currentKey = material.key;
         state = defaultState();
         vaultRecord = await encryptState(state, currentKey, salt);
         await dbPut(vaultRecord);
         dirty = false;
+        try { await vaultSession()?.start(material.rawKey); } catch (sessionError) { console.warn('Vault session resume unavailable', sessionError); } finally { material.rawKey.fill(0); }
         showApp();
       } catch (error) {
         console.error(error);
@@ -576,6 +590,7 @@
         currentKey = result.key;
         state = result.state;
         dirty = false;
+        try { await vaultSession()?.start(result.rawKey); } catch (sessionError) { console.warn('Vault session resume unavailable', sessionError); } finally { result.rawKey.fill(0); }
         showApp();
       } catch (error) {
         console.error(error);
@@ -662,6 +677,7 @@
       if (!confirm('Permanently erase the local encrypted finance vault from this browser? This cannot be undone without an encrypted backup.')) return;
       await dbDelete(VAULT_ID);
       vaultRecord = null; currentKey = null; state = null; dirty = false;
+      vaultSession()?.clear();
       clearTimeout(lockTimer); clearTimeout(saveTimer); saveTimer = null;
       showGate(false);
     };
@@ -696,6 +712,22 @@
       db = await openDb();
       vaultRecord = await dbGet(VAULT_ID);
       bindForms(); bindButtons(); bindAutoLock();
+      if (vaultRecord && vaultSession()?.isActive()) {
+        try {
+          currentKey = await vaultSession().restoreKey();
+          if (currentKey) {
+            state = await decryptRecordWithCurrentKey(vaultRecord);
+            dirty = false;
+            showApp();
+            return;
+          }
+        } catch (sessionError) {
+          console.warn('Could not resume vault session', sessionError);
+          currentKey = null;
+          state = null;
+          vaultSession()?.clear();
+        }
+      }
       showGate(Boolean(vaultRecord));
     } catch (error) {
       console.error(error);

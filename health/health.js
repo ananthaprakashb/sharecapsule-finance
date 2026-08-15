@@ -7,6 +7,7 @@
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const $ = (id) => document.getElementById(id);
+  const vaultSession = () => window.ShareCapsuleVaultSession || null;
   const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
   const pct1 = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 1 });
 
@@ -70,19 +71,38 @@
     });
   }
 
+  async function decryptVaultWithKey(record, cryptoKey) {
+    if (!record || !record.iv || !record.ciphertext) throw new Error('The local finance vault is not in a supported format.');
+    const plaintext = await crypto.subtle.decrypt({ name:'AES-GCM', iv:fromBase64(record.iv) }, cryptoKey, fromBase64(record.ciphertext));
+    return JSON.parse(decoder.decode(plaintext));
+  }
+
   async function decryptVault(record, passphrase) {
     const iterations = Number(record?.kdf?.iterations || 600000);
     if (!record || !record.salt || !record.iv || !record.ciphertext || !Number.isInteger(iterations)) throw new Error('The local finance vault is not in a supported format.');
-    const baseKey = await crypto.subtle.importKey('raw', encoder.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
-    const cryptoKey = await crypto.subtle.deriveKey(
-      { name:'PBKDF2', salt:fromBase64(record.salt), iterations, hash:'SHA-256' },
-      baseKey,
-      { name:'AES-GCM', length:256 },
-      false,
-      ['decrypt']
-    );
-    const plaintext = await crypto.subtle.decrypt({ name:'AES-GCM', iv:fromBase64(record.iv) }, cryptoKey, fromBase64(record.ciphertext));
-    return JSON.parse(decoder.decode(plaintext));
+    const baseKey = await crypto.subtle.importKey('raw', encoder.encode(passphrase), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name:'PBKDF2', salt:fromBase64(record.salt), iterations, hash:'SHA-256' }, baseKey, 256);
+    const rawKey = new Uint8Array(bits);
+    try {
+      const cryptoKey = await crypto.subtle.importKey('raw', rawKey, { name:'AES-GCM' }, false, ['encrypt','decrypt']);
+      const vault = await decryptVaultWithKey(record, cryptoKey);
+      try { await vaultSession()?.start(rawKey); } catch (sessionError) { console.warn('Vault session resume unavailable', sessionError); }
+      return vault;
+    } finally {
+      rawKey.fill(0);
+    }
+  }
+
+  function updateVaultSessionUi() {
+    const active = Boolean(vaultSession()?.isActive());
+    const field = $('vaultPassphraseField');
+    const input = $('vaultPassphrase');
+    if (field) field.hidden = active;
+    if (input) { input.required = !active; if (active) input.value = ''; }
+    const note = $('healthSessionNote');
+    if (note) note.textContent = active
+      ? 'Vault session active in this tab. Financial Health will read the encrypted local vault without asking for the passphrase again. State, income and household size remain session-only.'
+      : 'The comparison profile is session-only in this version. ShareCapsule does not persist your state, household income, household size, or passphrase from this page.';
   }
 
   function selectCohort(regionKey, income) {
@@ -357,7 +377,15 @@
       const record = await dbGet(db, VAULT_ID);
       db.close();
       if (!record) throw new Error('No encrypted finance vault was found on this device. Create or pair a vault in the Private Planner first.');
-      const vault = await decryptVault(record, $('vaultPassphrase').value);
+      let vault;
+      if (vaultSession()?.isActive()) {
+        const sessionKey = await vaultSession().restoreKey();
+        if (!sessionKey) throw new Error('Your vault session expired. Enter the vault passphrase to continue.');
+        vault = await decryptVaultWithKey(record, sessionKey);
+      } else {
+        vault = await decryptVault(record, $('vaultPassphrase').value);
+        updateVaultSessionUi();
+      }
       renderResults(vault, region, cohort, householdSize);
     } catch (error) {
       console.error(error);
@@ -386,6 +414,8 @@
 
   function init() {
     $('stateSelect').insertAdjacentHTML('beforeend', STATES.map(([code,name]) => `<option value="${code}">${escapeHtml(name)}</option>`).join(''));
+    updateVaultSessionUi();
+    window.addEventListener('sharecapsule:vault-session', updateVaultSessionUi);
     $('healthForm').addEventListener('submit', analyze);
     $('changeProfileButton').addEventListener('click', () => {
       $('results').hidden = true;

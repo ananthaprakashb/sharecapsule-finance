@@ -20,6 +20,7 @@ REQUIRED = [
     "404.html",
     "SECURITY.md",
     "PUBLISHING.md",
+    "vault-session.js",
     "health/index.html",
     "health/health.css",
     "health/health.js",
