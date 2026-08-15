@@ -24,6 +24,9 @@ jobs:
           node --check qr.js
           node --check sync.js
 
+      - name: Check Financial Health JavaScript syntax
+        run: node --check health/health.js
+
       - name: Check Income Project Lab JavaScript syntax
         run: |
           node --check passive-income/app.js
