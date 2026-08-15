@@ -141,3 +141,16 @@ Check desktop, tablet and narrow mobile layouts, including navigation, forms, QR
 ## Rollback rule
 
 If a release causes vault unlock failures, data-loss risk, sync overwrite behavior, unexpected plaintext network traffic, or a security regression, stop promotion and revert to the last validated release before continuing feature work.
+
+### Domain migration (.app → .org)
+
+Before changing the production CNAME away from `finance.sharecapsule.app`:
+
+1. Publish and verify **Privacy → Export all records** on the old domain.
+2. Export a portable records file from at least one realistic populated vault and keep the original `.app` domain available during validation.
+3. Bring up the `.org` domain with the same import-capable frontend before retiring `.app`.
+4. On `.org`, choose **Import existing ShareCapsule records**, then unlock with the original vault passphrase.
+5. Verify transactions, budgets, assets, debts, goals and Income Lab project history.
+6. Reconfigure encrypted device sync for the `.org` origin; sync authorization material is intentionally not migrated in the export.
+7. Update the Worker allowed origin/custom domain, CSP, canonical URLs, sitemap and Search Console configuration before making `.org` primary.
+8. Keep `.app` available as a migration/redirect surface until users have had a reasonable opportunity to export their browser-local records.

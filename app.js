@@ -5,6 +5,13 @@
   const DB_VERSION = 1;
   const STORE_NAME = 'vaults';
   const VAULT_ID = 'primary';
+  const MIGRATION_PENDING_ID = 'migration-pending';
+  const PORTABLE_EXPORT_FORMAT = 'sharecapsule-finance-export-v2';
+  const INCOME_DB_NAME = 'sharecapsule-income-projects';
+  const INCOME_DB_VERSION = 1;
+  const INCOME_STORE = 'workspace';
+  const INCOME_STATE_ID = 'state';
+  const INCOME_KEY_ID = 'device-key';
   const KDF_ITERATIONS = 600000;
   const AUTO_LOCK_MS = 10 * 60 * 1000;
   const encoder = new TextEncoder();
@@ -474,32 +481,181 @@
     return { applied: true, unlocked: false };
   }
 
+  function openIncomeDb() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(INCOME_DB_NAME, INCOME_DB_VERSION);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains(INCOME_STORE)) request.result.createObjectStore(INCOME_STORE, { keyPath: 'id' });
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  function externalDbGet(database, storeName, id) {
+    return new Promise((resolve, reject) => {
+      const request = database.transaction(storeName, 'readonly').objectStore(storeName).get(id);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  function externalDbPut(database, storeName, value) {
+    return new Promise((resolve, reject) => {
+      const request = database.transaction(storeName, 'readwrite').objectStore(storeName).put(value);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async function loadIncomeLabStateForExport() {
+    if (typeof indexedDB.databases === 'function') {
+      try {
+        const databases = await indexedDB.databases();
+        if (!databases.some((item) => item.name === INCOME_DB_NAME)) return null;
+      } catch (_) { /* Fall back to opening the known local database. */ }
+    }
+    const incomeDb = await openIncomeDb();
+    try {
+      const keyRecord = await externalDbGet(incomeDb, INCOME_STORE, INCOME_KEY_ID);
+      const record = await externalDbGet(incomeDb, INCOME_STORE, INCOME_STATE_ID);
+      if (!keyRecord?.key || !record?.iv || !record?.ciphertext) return null;
+      const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(record.iv) }, keyRecord.key, base64ToBytes(record.ciphertext));
+      const parsed = JSON.parse(decoder.decode(plaintext));
+      if (!parsed || !Array.isArray(parsed.projects)) return null;
+      return { version: 1, focusProjectId: parsed.focusProjectId || null, projects: parsed.projects.slice(0, 100) };
+    } finally {
+      incomeDb.close();
+    }
+  }
+
+  async function encryptPortablePayload(value, key) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoder.encode(JSON.stringify(value)));
+    return {
+      format: 'sharecapsule-income-projects-portable-v1',
+      iv: bytesToBase64(iv),
+      ciphertext: bytesToBase64(ciphertext)
+    };
+  }
+
+  function validatePortablePayload(payload) {
+    if (!payload || payload.format !== 'sharecapsule-income-projects-portable-v1') return false;
+    if (typeof payload.iv !== 'string' || typeof payload.ciphertext !== 'string') return false;
+    try {
+      return base64ToBytes(payload.iv).length === 12 && base64ToBytes(payload.ciphertext).length > 16;
+    } catch (_) { return false; }
+  }
+
+  async function restoreIncomeLabFromPortable(payload, key) {
+    if (!validatePortablePayload(payload)) throw new Error('Income Lab migration payload is invalid');
+    const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(payload.iv) }, key, base64ToBytes(payload.ciphertext));
+    const parsed = JSON.parse(decoder.decode(plaintext));
+    if (!parsed || !Array.isArray(parsed.projects)) throw new Error('Income Lab migration data is invalid');
+    const nextState = { version: 1, focusProjectId: parsed.focusProjectId || null, projects: parsed.projects.slice(0, 100) };
+
+    const incomeDb = await openIncomeDb();
+    try {
+      let keyRecord = await externalDbGet(incomeDb, INCOME_STORE, INCOME_KEY_ID);
+      if (!keyRecord?.key) {
+        const deviceKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+        keyRecord = { id: INCOME_KEY_ID, key: deviceKey, createdAt: new Date().toISOString() };
+        await externalDbPut(incomeDb, INCOME_STORE, keyRecord);
+      }
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, keyRecord.key, encoder.encode(JSON.stringify(nextState)));
+      await externalDbPut(incomeDb, INCOME_STORE, {
+        id: INCOME_STATE_ID,
+        format: 'sharecapsule-income-projects-v1',
+        iv: bytesToBase64(iv),
+        ciphertext: bytesToBase64(ciphertext),
+        updatedAt: new Date().toISOString()
+      });
+    } finally {
+      incomeDb.close();
+    }
+  }
+
+  async function restorePendingMigrationData() {
+    const pending = await dbGet(MIGRATION_PENDING_ID);
+    if (!pending) return false;
+    if (pending.incomeLab) await restoreIncomeLabFromPortable(pending.incomeLab, currentKey);
+    await dbDelete(MIGRATION_PENDING_ID);
+    return Boolean(pending.incomeLab);
+  }
+
   async function importBackup(file) {
-    if (!file || file.size > 25 * 1024 * 1024) throw new Error('Backup file is too large');
+    if (!file || file.size > 25 * 1024 * 1024) throw new Error('Export file is too large');
     const text = await file.text();
-    const record = JSON.parse(text);
-    if (!validateBackupRecord(record)) throw new Error('This is not a valid ShareCapsule encrypted finance backup');
-    record.id = VAULT_ID;
+    const parsed = JSON.parse(text);
+    let record;
+    let portable = null;
+
+    if (parsed?.format === PORTABLE_EXPORT_FORMAT) {
+      if (parsed.version !== 2 || !validateBackupRecord(parsed.vault)) throw new Error('This ShareCapsule records export is invalid');
+      if (parsed.incomeLab && !validatePortablePayload(parsed.incomeLab)) throw new Error('The Income Lab section of this export is invalid');
+      portable = parsed;
+      record = { ...parsed.vault, id: VAULT_ID };
+    } else {
+      if (!validateBackupRecord(parsed)) throw new Error('This is not a valid ShareCapsule encrypted finance backup or records export');
+      record = { ...parsed, id: VAULT_ID };
+    }
+
     await dbPut(record);
+    if (portable?.incomeLab) {
+      await dbPut({
+        id: MIGRATION_PENDING_ID,
+        format: 'sharecapsule-domain-migration-pending-v1',
+        incomeLab: portable.incomeLab,
+        sourceOrigin: typeof portable.sourceOrigin === 'string' ? portable.sourceOrigin : '',
+        importedAt: new Date().toISOString()
+      });
+    } else {
+      await dbDelete(MIGRATION_PENDING_ID);
+    }
+
     vaultRecord = record;
     dirty = false;
     lockVault();
-    alert('Encrypted backup restored. Unlock it with the passphrase used when the backup was created.');
+    alert(portable
+      ? 'Records imported. Unlock with your existing vault passphrase. Income Lab progress will be restored locally after a successful unlock.'
+      : 'Encrypted backup restored. Unlock it with the passphrase used when the backup was created.');
   }
 
   async function exportBackup() {
+    if (!currentKey || !state) throw new Error('Unlock the vault before exporting records');
     if (dirty) await persist();
     const record = await dbGet(VAULT_ID);
-    if (!record) return;
-    const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' });
+    if (!record) throw new Error('No encrypted finance vault was found');
+
+    let incomeLab = null;
+    try {
+      const incomeState = await loadIncomeLabStateForExport();
+      if (incomeState) incomeLab = await encryptPortablePayload(incomeState, currentKey);
+    } catch (error) {
+      console.error('Could not include Income Lab progress in export', error);
+      throw new Error('Could not prepare the complete records export. Income Lab progress could not be read safely.');
+    }
+
+    const bundle = {
+      format: PORTABLE_EXPORT_FORMAT,
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      sourceOrigin: window.location.origin,
+      vault: record,
+      incomeLab
+    };
+
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `sharecapsule-finance-backup-${nowIsoDate()}.json`;
+    link.download = `sharecapsule-finance-records-${nowIsoDate()}.json`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setSaveState(`Portable encrypted export downloaded · ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`);
   }
 
   function parseCsvLine(line) {
@@ -591,7 +747,15 @@
         state = result.state;
         dirty = false;
         try { await vaultSession()?.start(result.rawKey); } catch (sessionError) { console.warn('Vault session resume unavailable', sessionError); } finally { result.rawKey.fill(0); }
+        let migrationMessage = '';
+        try {
+          if (await restorePendingMigrationData()) migrationMessage = 'Income Lab progress from the imported records file was restored on this domain.';
+        } catch (migrationError) {
+          console.error('Could not restore migrated Income Lab progress', migrationError);
+          migrationMessage = 'Vault unlocked, but Income Lab progress could not be restored. Keep the exported records file and try the import again.';
+        }
         showApp();
+        if (migrationMessage) setTimeout(() => alert(migrationMessage), 0);
       } catch (error) {
         console.error(error);
         currentKey = null;
@@ -650,7 +814,9 @@
     $('lockButton').addEventListener('click', async () => { if (dirty) await persist(); lockVault(); });
     $('refreshPlan').addEventListener('click', renderPlanner);
     $('importCsvButton').addEventListener('click', () => $('csvFileInput').click());
-    $('exportBackupButton').addEventListener('click', exportBackup);
+    $('exportBackupButton').addEventListener('click', async () => {
+      try { await exportBackup(); } catch (error) { console.error(error); alert(error.message || 'Could not export records.'); }
+    });
     $('importBackupButton').addEventListener('click', () => $('backupFileInput').click());
     $('importBackupAtGate').addEventListener('click', () => $('backupFileInput').click());
     $('importBackupUnlock').addEventListener('click', () => $('backupFileInput').click());
@@ -663,7 +829,7 @@
     $('backupFileInput').addEventListener('change', async (event) => {
       try {
         const file = event.target.files?.[0];
-        if (file && confirm('Restore this encrypted backup? It will replace the encrypted vault currently stored in this browser.')) await importBackup(file);
+        if (file && confirm('Import this ShareCapsule records file? It will replace the encrypted finance vault currently stored in this browser.')) await importBackup(file);
       } catch (error) { alert(error.message || 'Could not restore backup.'); }
       event.target.value = '';
     });
@@ -676,6 +842,7 @@
     const erase = async () => {
       if (!confirm('Permanently erase the local encrypted finance vault from this browser? This cannot be undone without an encrypted backup.')) return;
       await dbDelete(VAULT_ID);
+      await dbDelete(MIGRATION_PENDING_ID);
       vaultRecord = null; currentKey = null; state = null; dirty = false;
       vaultSession()?.clear();
       clearTimeout(lockTimer); clearTimeout(saveTimer); saveTimer = null;

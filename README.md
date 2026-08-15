@@ -93,3 +93,17 @@ Before broad promotion, run the full `PUBLISHING.md` checklist. The release gate
 Read `SECURITY.md` before enabling sync for real financial information.
 
 Local-only remains the default and does not require the sync relay.
+
+## Domain migration export
+
+Because IndexedDB is origin-scoped, browser data at `finance.sharecapsule.app` does not automatically appear at a future `finance.sharecapsule.org` origin. The unlocked planner therefore provides **Privacy → Export all records**.
+
+The portable `sharecapsule-finance-export-v2` JSON file contains:
+
+- the existing AES-GCM encrypted finance vault envelope
+- Income Project Lab state, when present, re-encrypted under the finance vault key for portability
+- non-sensitive export metadata such as format version and source origin
+
+The export intentionally excludes device-sync authorization material and tab-session state. On the destination domain, import the file, unlock with the existing vault passphrase, verify the planner and Income Lab data, and then configure device sync again for the new origin.
+
+Legacy `sharecapsule-private-finance-v1` encrypted backup files remain import-compatible.

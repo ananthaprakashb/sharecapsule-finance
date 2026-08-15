@@ -168,3 +168,9 @@ Before enabling real-user multi-device sync:
 ## Reference guidance used for the design
 
 The finance vault uses browser cryptography primitives from the Web Cryptography API, with AES-GCM authenticated encryption and PBKDF2-HMAC-SHA-256 for passphrase derivation. The client intentionally does not persist plaintext finance state in LocalStorage, SessionStorage or IndexedDB.
+
+## Portable domain migration export
+
+The domain-migration export is designed to move browser-local records between ShareCapsule Finance origins without creating a plaintext export. The finance vault remains in its existing AES-GCM encrypted envelope. Income Project Lab state is decrypted locally with its device-held key only long enough to be re-encrypted under the already-unlocked finance vault key and written into the portable export. The passphrase, finance vault key, Income Lab device key, sync authorization token and vault-session wrapping key are never written into the export file.
+
+On import, the encrypted finance vault is restored first. After the user successfully unlocks it with the original passphrase, the browser decrypts the portable Income Lab payload locally and re-encrypts it under a new destination-origin device key. Device-sync credentials are deliberately excluded and must be re-established on the destination origin.
