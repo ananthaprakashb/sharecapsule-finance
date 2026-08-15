@@ -30,6 +30,16 @@
     { id:'lifestyle', label:'Lifestyle & personal', peer: c => sum(c.apparel,c.entertainment,c.personalCare,c.miscellaneous), user:['entertainment','shopping'], kind:'flexible', note:'This is an approximate alignment of Entertainment + Shopping with BLS apparel, entertainment, personal care and miscellaneous spending.' }
   ];
 
+  const GUIDES = {
+    expenses: { title:'Income & expenses', path:'/guide/expenses.html', description:'Control cash flow, category drift, fixed costs and flexible spending.' },
+    credit: { title:'Credit cards & debt', path:'/guide/credit-cards.html', description:'Manage APR, payment priority, utilization and revolving balances.' },
+    emergency: { title:'Emergency reserves', path:'/guide/emergency-fund.html', description:'Build liquidity around household risk and essential monthly spending.' },
+    investing: { title:'Investment categories', path:'/guide/investing.html', description:'Direct sustainable surplus toward goals by time horizon and risk capacity.' },
+    retirement: { title:'Retirement', path:'/guide/retirement.html', description:'Use workplace plans, contribution ladders and tax-advantaged accounts deliberately.' },
+    protection: { title:'Insurance & risk', path:'/guide/protection.html', description:'Review catastrophic-risk protection, deductibles and household exposure.' },
+    review: { title:'Monthly control review', path:'/guide/review.html', description:'Keep the financial system current with a repeatable monthly review.' }
+  };
+
   let benchmarks = null;
 
   function sum(...values) { return values.reduce((total, value) => total + (Number.isFinite(Number(value)) ? Number(value) : 0), 0); }
@@ -188,24 +198,80 @@
   function buildActions(stats, balances, comparisons, score) {
     const actions = [];
     const monthlyNet = stats.monthlyIncome - stats.monthlyExpenses;
-    if (stats.monthlyIncome > 0 && monthlyNet < 0) actions.push({ priority:100, title:'Stop the recurring deficit first', detail:`Your recent tracked spending is about ${money.format(Math.abs(monthlyNet))} per month above tracked income. Review structural costs and the largest flexible categories before optimizing investments.` });
+    if (stats.monthlyIncome > 0 && monthlyNet < 0) actions.push({ priority:100, guideId:'expenses', title:'Stop the recurring deficit first', detail:`Your recent tracked spending is about ${money.format(Math.abs(monthlyNet))} per month above tracked income. Review structural costs and the largest flexible categories before optimizing investments.` });
     if (score.runway != null && score.runway < 3) {
       const gap = Math.max(0, stats.monthlyExpenses * 3 - balances.cash);
-      actions.push({ priority:90, title:'Build a 3-month liquidity checkpoint', detail:`Cash currently covers about ${score.runway.toFixed(1)} months of tracked spending. Reaching 3 months would require roughly ${money.format(gap)} more liquid reserve at the current spending level.` });
+      actions.push({ priority:90, guideId:'emergency', title:'Build a 3-month liquidity checkpoint', detail:`Cash currently covers about ${score.runway.toFixed(1)} months of tracked spending. Reaching 3 months would require roughly ${money.format(gap)} more liquid reserve at the current spending level.` });
     }
     const topDebt = balances.highestAprDebt;
-    if (topDebt && Number(topDebt.apr) >= 10) actions.push({ priority:95, title:`Prioritize ${topDebt.name || 'high-interest debt'}`, detail:`The highest tracked APR is ${Number(topDebt.apr).toFixed(2)}% on about ${money.format(Number(topDebt.balance)||0)}. After required payments and basic liquidity, high-cost debt deserves priority over discretionary expansion.` });
+    if (topDebt && Number(topDebt.apr) >= 10) actions.push({ priority:95, guideId:'credit', title:`Prioritize ${topDebt.name || 'high-interest debt'}`, detail:`The highest tracked APR is ${Number(topDebt.apr).toFixed(2)}% on about ${money.format(Number(topDebt.balance)||0)}. After required payments and basic liquidity, high-cost debt deserves priority over discretionary expansion.` });
 
     comparisons.filter(item => item.status === 'review').forEach(item => {
       const peerAlignedAtUserScale = item.peerShare * stats.monthlyExpenses;
       const difference = Math.max(0, item.userMonthly - peerAlignedAtUserScale);
-      if (item.kind === 'flexible') actions.push({ priority:70 + difference / 1000, title:`Review ${item.label.toLowerCase()}`, detail:`This category is ${pct1.format(item.userShare)} of your tracked spending versus ${pct1.format(item.peerShare)} for the peer estimate. Moving partway toward the peer share could free about ${money.format(difference)} per month; confirm the underlying transactions before changing the budget.` });
-      else if (item.kind === 'structural') actions.push({ priority:60 + difference / 1000, title:`Review structural ${item.label.toLowerCase()} costs`, detail:`Your share is ${pct1.format(item.userShare)} versus ${pct1.format(item.peerShare)} for the peer estimate. Look for renewal, housing, vehicle, utility, insurance-linked or financing decisions rather than forcing an immediate short-term cut.` });
+      if (item.kind === 'flexible') actions.push({ priority:70 + difference / 1000, guideId:'expenses', title:`Review ${item.label.toLowerCase()}`, detail:`This category is ${pct1.format(item.userShare)} of your tracked spending versus ${pct1.format(item.peerShare)} for the peer estimate. Moving partway toward the peer share could free about ${money.format(difference)} per month; confirm the underlying transactions before changing the budget.` });
+      else if (item.kind === 'structural') actions.push({ priority:60 + difference / 1000, guideId:'expenses', title:`Review structural ${item.label.toLowerCase()} costs`, detail:`Your share is ${pct1.format(item.userShare)} versus ${pct1.format(item.peerShare)} for the peer estimate. Look for renewal, housing, vehicle, utility, insurance-linked or financing decisions rather than forcing an immediate short-term cut.` });
     });
 
-    if (!actions.length && score.cashFlowRate != null && score.cashFlowRate >= .10) actions.push({ priority:40, title:'Protect the monthly margin', detail:`Your recent tracked margin is ${pct1.format(score.cashFlowRate)}. Assign it intentionally across emergency reserves, debt payoff, named goals and long-term investing instead of allowing lifestyle drift.` });
-    if (!actions.length) actions.push({ priority:10, title:'Improve the data baseline', detail:'Keep at least two to three months of transactions, current cash balances and debt APRs in the private vault. A stronger baseline produces more useful comparisons.' });
+    if (!actions.length && score.cashFlowRate != null && score.cashFlowRate >= .10) actions.push({ priority:40, guideId:'investing', title:'Protect the monthly margin', detail:`Your recent tracked margin is ${pct1.format(score.cashFlowRate)}. Assign it intentionally across emergency reserves, debt payoff, named goals and long-term investing instead of allowing lifestyle drift.` });
+    if (!actions.length) actions.push({ priority:10, guideId:'review', title:'Improve the data baseline', detail:'Keep at least two to three months of transactions, current cash balances and debt APRs in the private vault. A stronger baseline produces more useful comparisons.' });
     return actions.sort((a,b) => b.priority - a.priority).slice(0,3);
+  }
+
+  function buildGuideRecommendations(stats, balances, comparisons, score) {
+    const recommendations = new Map();
+    const add = (guideId, priority, reason) => {
+      const guide = GUIDES[guideId];
+      if (!guide) return;
+      const current = recommendations.get(guideId);
+      if (!current || priority > current.priority) recommendations.set(guideId, { guideId, priority, reason, ...guide });
+    };
+
+    const monthlyNet = stats.monthlyIncome - stats.monthlyExpenses;
+    const highestApr = Number(balances.highestAprDebt?.apr) || 0;
+
+    if (stats.monthlyIncome > 0 && monthlyNet < 0) {
+      add('expenses', 100, `Tracked expenses are about ${money.format(Math.abs(monthlyNet))} per month above tracked income. Start by restoring a sustainable monthly margin.`);
+    }
+    if (highestApr >= 10) {
+      add('credit', 95, `Your highest tracked APR is ${highestApr.toFixed(2)}%. Understanding payoff priority and revolving-credit cost can have immediate impact.`);
+    }
+    if (score.runway != null && score.runway < 3) {
+      add('emergency', 90, `Your liquid reserve covers about ${score.runway.toFixed(1)} months of tracked spending, below the first 3-month resilience checkpoint used by this planner.`);
+    }
+
+    const reviewed = comparisons.filter(item => item.status === 'review');
+    if (reviewed.length) {
+      const labels = reviewed.slice(0,3).map(item => item.label).join(', ');
+      add('expenses', 78, `${labels} ${reviewed.length === 1 ? 'is' : 'are'} materially above the peer spending share. Use the expense guide to inspect recurring and flexible costs before setting a new target.`);
+    }
+
+    const healthcare = comparisons.find(item => item.id === 'healthcare');
+    if (healthcare && healthcare.peerShare > 0 && healthcare.userShare > healthcare.peerShare * 1.25 && healthcare.pointDelta > .03) {
+      add('protection', 55, 'Healthcare is materially above the peer pattern. Review insurance structure, deductibles and protection gaps rather than assuming necessary care should simply be cut.');
+    }
+
+    if (score.cashFlowRate != null && score.cashFlowRate >= .10 && highestApr < 10 && (score.runway == null || score.runway >= 3)) {
+      add('investing', 45, `Your tracked monthly margin is ${pct1.format(score.cashFlowRate)} and no high-cost debt signal is taking priority. The investing guide can help assign surplus by goal and time horizon.`);
+    }
+    if (score.cashFlowRate != null && score.cashFlowRate >= .15 && highestApr < 10 && score.runway != null && score.runway >= 3) {
+      add('retirement', 40, 'With positive cash flow and a basic liquidity cushion, review whether retirement contributions are capturing available long-term advantages.');
+    }
+
+    add('review', 15, 'Use the monthly control review to confirm that improvements persist and to catch new spending, debt or liquidity drift early.');
+
+    return [...recommendations.values()].sort((a,b) => b.priority - a.priority).slice(0,3);
+  }
+
+  function ensureGuidePanel() {
+    if ($('recommendedGuidesPanel')) return;
+    const anchor = document.querySelector('#results .two-col');
+    if (!anchor) return;
+    const panel = document.createElement('section');
+    panel.className = 'panel';
+    panel.id = 'recommendedGuidesPanel';
+    panel.innerHTML = '<div class="section-heading"><div><p class="eyebrow">Recommended from your results</p><h2>Guide sections to improve financial health</h2></div><span class="muted">Selected locally from your health signals.</span></div><div class="actions" id="guideRecommendations"></div>';
+    anchor.insertAdjacentElement('afterend', panel);
   }
 
   function renderComparisons(comparisons) {
@@ -218,7 +284,18 @@
   }
 
   function renderActions(actions) {
-    $('actionList').innerHTML = actions.map((action,index) => `<div class="action-card"><div class="action-rank">${index+1}</div><div><strong>${escapeHtml(action.title)}</strong><p>${escapeHtml(action.detail)}</p></div></div>`).join('');
+    $('actionList').innerHTML = actions.map((action,index) => {
+      const guide = GUIDES[action.guideId];
+      const guideLink = guide ? `<div class="method-links"><a href="${guide.path}">Recommended guide: ${escapeHtml(guide.title)} →</a></div>` : '';
+      return `<div class="action-card"><div class="action-rank">${index+1}</div><div><strong>${escapeHtml(action.title)}</strong><p>${escapeHtml(action.detail)}</p>${guideLink}</div></div>`;
+    }).join('');
+  }
+
+  function renderGuideRecommendations(recommendations) {
+    ensureGuidePanel();
+    const container = $('guideRecommendations');
+    if (!container) return;
+    container.innerHTML = recommendations.map((item,index) => `<div class="action-card"><div class="action-rank">${index+1}</div><div>${index === 0 ? '<p class="eyebrow">Start here</p>' : ''}<strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.reason)}</p><p>${escapeHtml(item.description)}</p><div class="method-links"><a href="${item.path}">Open ${escapeHtml(item.title)} guide →</a></div></div></div>`).join('');
   }
 
   function renderComponents(components) {
@@ -236,6 +313,7 @@
     const comparisons = compareGroups(stats, cohort);
     const score = scoreHealth(stats, balances, comparisons);
     const actions = buildActions(stats, balances, comparisons, score);
+    const guideRecommendations = buildGuideRecommendations(stats, balances, comparisons, score);
 
     $('healthScore').textContent = String(score.total);
     $('healthLabel').textContent = score.label;
@@ -253,6 +331,7 @@
 
     renderComparisons(comparisons);
     renderActions(actions);
+    renderGuideRecommendations(guideRecommendations);
     renderComponents(score.components);
     $('setupPanel').hidden = true;
     $('results').hidden = false;
