@@ -23,8 +23,12 @@ REQUIRED = [
     "health/index.html",
     "health/health.css",
     "health/health.js",
+    "health/guide-journey.js",
     "health/benchmarks.json",
     "guide/index.html",
+    "guide/focus/index.html",
+    "guide/focus/focus.css",
+    "guide/focus/focus.js",
     "guide/expenses.html",
     "guide/credit-cards.html",
     "guide/emergency-fund.html",
@@ -160,6 +164,17 @@ def validate_benchmarks(errors: list[str]) -> None:
                     errors.append(f"Financial Health benchmark has invalid {field} in {region_name}/{cohort.get('id')}")
 
 
+def validate_focus_privacy(errors: list[str]) -> None:
+    focus_html = (ROOT / "guide/focus/index.html").read_text(encoding="utf-8")
+    if 'name="robots" content="noindex,nofollow"' not in focus_html:
+        errors.append("Private guide focus page must remain noindex,nofollow")
+    journey_js = (ROOT / "health/guide-journey.js").read_text(encoding="utf-8")
+    if "sessionStorage" not in journey_js:
+        errors.append("Guide journey must keep contextual health handoff in sessionStorage")
+    if "localStorage" in journey_js:
+        errors.append("Guide journey must not persist contextual health handoff in localStorage")
+
+
 def validate_sitemap(errors: list[str]) -> None:
     sitemap = ROOT / "sitemap.xml"
     try:
@@ -208,6 +223,8 @@ def validate_sitemap(errors: list[str]) -> None:
     missing = expected_paths - actual_paths
     if missing:
         errors.append("Sitemap is missing launch pages: " + ", ".join(sorted(missing)))
+    if "/guide/focus/" in actual_paths:
+        errors.append("Private contextual guide focus page must not appear in sitemap.xml")
 
 
 def main() -> int:
@@ -217,6 +234,7 @@ def main() -> int:
         validate_domain(errors)
         validate_html(errors)
         validate_benchmarks(errors)
+        validate_focus_privacy(errors)
         validate_sitemap(errors)
 
     if errors:
