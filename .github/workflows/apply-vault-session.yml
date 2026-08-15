@@ -1,0 +1,44 @@
+name: Apply vault navigation session
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/apply_vault_session.py
+      - .github/workflows/apply-vault-session.yml
+      - vault-session.js
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply guarded patch
+        run: python3 scripts/apply_vault_session.py
+
+      - name: Validate patched platform
+        run: |
+          python3 scripts/validate_static.py
+          node --check vault-session.js
+          node --check app.js
+          node --check health/health.js
+          node --check guide/focus/focus.js
+
+      - name: Commit patch
+        run: |
+          git config user.name "ShareCapsule automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Keep vault session across platform navigation"
+            git push origin HEAD:main
+          fi
