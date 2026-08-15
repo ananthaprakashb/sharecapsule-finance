@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
+import csv
 import io
 import json
-import re
+from datetime import datetime, timezone
 from pathlib import Path
 
-import openpyxl
 import requests
 
-YEAR = "2023-2024"
-INDEX_URL = "https://www.bls.gov/cex/tables/cross-tab/mean.htm"
+YEAR = 2024
+BASE = "https://download.bls.gov/pub/time.series/cx"
+SERIES_URL = f"{BASE}/cx.series"
+DATA_URL = f"{BASE}/cx.data.1.AllData"
+
 REGIONS = {
     "northeast": "Northeast",
     "midwest": "Midwest",
@@ -26,125 +29,168 @@ BANDS = [
     {"id": "150-200", "label": "$150,000 to $199,999", "min": 150000, "max": 199999},
     {"id": "200plus", "label": "$200,000 and more", "min": 200000, "max": None},
 ]
-FIELDS = {
-    "average annual expenditures": "annualExpenditures",
-    "income before taxes": "averageIncomeBeforeTax",
-    "income after taxes": "averageIncomeAfterTax",
-    "people": "averagePeople",
-    "food": "food",
-    "housing": "housing",
-    "apparel and services": "apparel",
-    "transportation": "transportation",
-    "healthcare": "healthcare",
-    "entertainment": "entertainment",
-    "personal care products and services": "personalCare",
-    "education": "education",
-    "miscellaneous": "miscellaneous",
-    "personal insurance and pensions": "personalInsurancePensions",
+
+FIELD_PREFIXES = {
+    "annualExpenditures": ["total expenditures", "average annual expenditures"],
+    "averageIncomeBeforeTax": ["income before taxes"],
+    "averageIncomeAfterTax": ["income after taxes"],
+    "averagePeople": ["people"],
+    "food": ["food"],
+    "housing": ["housing"],
+    "apparel": ["apparel and services"],
+    "transportation": ["transportation"],
+    "healthcare": ["healthcare"],
+    "entertainment": ["entertainment"],
+    "personalCare": ["personal care products and services"],
+    "education": ["education"],
+    "miscellaneous": ["miscellaneous"],
+    "personalInsurancePensions": ["personal insurance and pensions"],
 }
 
-BROWSER_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Cache-Control": "no-cache",
-    "Pragma": "no-cache",
+HEADERS = {
+    "User-Agent": "ShareCapsule-Finance-Benchmark-Refresh/1.0 (public BLS LABSTAT data)",
+    "Accept": "text/plain,application/octet-stream,*/*;q=0.5",
 }
 
 
-def text(value):
-    return re.sub(r"\s+", " ", str(value or "").strip()).lower()
-
-
-def numeric_tail(row, count=10):
-    values = []
-    for value in row:
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            values.append(float(value))
-    if len(values) < count:
-        return None
-    return values[-count:]
-
-
-def row_label(row):
-    candidates = [text(value) for value in row[:8] if isinstance(value, str) and value.strip()]
-    return " ".join(candidates)
-
-
-def find_field(rows, needle):
-    matches = []
-    for row in rows:
-        label = row_label(row)
-        if needle in label:
-            nums = numeric_tail(row)
-            if nums:
-                matches.append((label, nums))
-    if not matches:
-        raise RuntimeError(f"Could not find row for {needle!r}")
-    matches.sort(key=lambda item: len(item[0]))
-    return matches[0][1]
-
-
-def open_bls_session():
-    session = requests.Session()
-    session.headers.update(BROWSER_HEADERS)
-    warm = session.get(INDEX_URL, timeout=60)
-    warm.raise_for_status()
-    return session
-
-
-def extract_region(session, slug, region_name):
-    url = f"https://www.bls.gov/cex/tables/cross-tab/mean/cu-region-by-income-{slug}-{YEAR}.xlsx"
-    headers = {
-        "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream;q=0.9,*/*;q=0.8",
-        "Referer": INDEX_URL,
-    }
-    response = session.get(url, timeout=60, headers=headers)
+def download_text(url):
+    response = requests.get(url, timeout=120, headers=HEADERS)
     response.raise_for_status()
-    if not response.content.startswith(b"PK"):
-        raise RuntimeError(f"BLS did not return an Excel workbook for {region_name}")
-    workbook = openpyxl.load_workbook(io.BytesIO(response.content), data_only=True)
-    sheet = workbook[workbook.sheetnames[0]]
-    rows = list(sheet.iter_rows(values_only=True))
+    return response.content.decode("utf-8-sig", errors="replace")
 
-    extracted = {field: find_field(rows, needle) for needle, field in FIELDS.items()}
-    cohorts = []
-    for index, band in enumerate(BANDS, start=1):
-        cohort = dict(band)
-        for field, values in extracted.items():
-            cohort[field] = values[index]
-        cohorts.append(cohort)
 
-    return {
-        "name": region_name,
-        "source": url,
-        "cohorts": cohorts,
-    }
+def rows_from_tsv(text):
+    reader = csv.DictReader(io.StringIO(text), delimiter="\t")
+    result = []
+    for row in reader:
+        result.append({str(key).strip(): (value.strip() if isinstance(value, str) else value) for key, value in row.items()})
+    return result
+
+
+def normalize(value):
+    return " ".join(str(value or "").lower().split())
+
+
+def matches_title(title, demographic, characteristic, prefixes):
+    norm = normalize(title)
+    marker = f" by {normalize(demographic)}: "
+    if marker not in norm:
+        return False
+    if not norm.endswith(normalize(characteristic)):
+        return False
+    subject = norm.split(marker, 1)[0]
+    return any(subject == normalize(prefix) for prefix in prefixes)
+
+
+def series_index(series_rows):
+    return [(row.get("series_id", ""), row.get("series_title", "")) for row in series_rows if row.get("series_id") and row.get("series_title")]
+
+
+def find_series(index, demographic, characteristic, prefixes):
+    matches = [series_id for series_id, title in index if matches_title(title, demographic, characteristic, prefixes)]
+    if not matches:
+        raise RuntimeError(f"No LABSTAT series found for {prefixes[0]} by {demographic}: {characteristic}")
+    if len(matches) > 1:
+        raise RuntimeError(f"Ambiguous LABSTAT series for {prefixes[0]} by {demographic}: {characteristic}: {matches[:5]}")
+    return matches[0]
+
+
+def values_for_year(data_text, wanted_ids):
+    wanted = set(wanted_ids)
+    values = {}
+    reader = csv.DictReader(io.StringIO(data_text), delimiter="\t")
+    for raw in reader:
+        row = {str(key).strip(): (value.strip() if isinstance(value, str) else value) for key, value in raw.items()}
+        series_id = row.get("series_id", "")
+        if series_id not in wanted or row.get("year") != str(YEAR) or row.get("period") != "A01":
+            continue
+        try:
+            values[series_id] = float(row.get("value", ""))
+        except (TypeError, ValueError):
+            values[series_id] = None
+    return values
+
+
+def build_profile(index, values, demographic, characteristic):
+    result = {}
+    for field, prefixes in FIELD_PREFIXES.items():
+        series_id = find_series(index, demographic, characteristic, prefixes)
+        result[field] = values.get(series_id)
+    return result
+
+
+def ratio(value, base):
+    if value is None or base in (None, 0):
+        return 1.0
+    return float(value) / float(base)
+
+
+def regionalize(income_profile, region_profile, national_profile):
+    cohort = {}
+    for field in FIELD_PREFIXES:
+        income_value = income_profile.get(field)
+        region_value = region_profile.get(field)
+        national_value = national_profile.get(field)
+        if income_value is None:
+            cohort[field] = None
+            continue
+        # Apply the region's current relative level for the same measure to the
+        # national income-range mean. This is an estimate, not an official cross-tab.
+        cohort[field] = round(float(income_value) * ratio(region_value, national_value), 2)
+    return cohort
 
 
 def main():
-    session = open_bls_session()
-    regions = {slug: extract_region(session, slug, name) for slug, name in REGIONS.items()}
+    series_rows = rows_from_tsv(download_text(SERIES_URL))
+    index = series_index(series_rows)
+
+    characteristics = ["All Consumer Units"] + [band["label"] for band in BANDS] + list(REGIONS.values())
+    ids = []
+    for characteristic in characteristics:
+        demographic = "Income Range" if characteristic == "All Consumer Units" or characteristic in [band["label"] for band in BANDS] else "Region of residence"
+        for prefixes in FIELD_PREFIXES.values():
+            ids.append(find_series(index, demographic, characteristic, prefixes))
+
+    data_text = download_text(DATA_URL)
+    values = values_for_year(data_text, ids)
+
+    national = build_profile(index, values, "Income Range", "All Consumer Units")
+    income_profiles = {band["id"]: build_profile(index, values, "Income Range", band["label"]) for band in BANDS}
+
+    regions = {}
+    for slug, region_name in REGIONS.items():
+        region_profile = build_profile(index, values, "Region of residence", region_name)
+        cohorts = []
+        for band in BANDS:
+            estimated = regionalize(income_profiles[band["id"]], region_profile, national)
+            cohorts.append({**band, **estimated})
+        regions[slug] = {
+            "name": region_name,
+            "source": "BLS CE LABSTAT 2024 income-range and region means",
+            "cohorts": cohorts,
+        }
+
     result = {
-        "schemaVersion": 1,
-        "source": "U.S. Bureau of Labor Statistics Consumer Expenditure Surveys",
-        "sourcePeriod": YEAR,
-        "generatedFrom": "BLS region of residence by income before taxes cross-tabulated means tables",
-        "generatedAt": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+        "schemaVersion": 2,
+        "source": "U.S. Bureau of Labor Statistics Consumer Expenditure Surveys LABSTAT",
+        "sourcePeriod": str(YEAR),
+        "benchmarkMethod": "regionalized-income-cohort",
+        "isExactCrossTab": False,
+        "generatedFrom": "BLS 2024 annual income-range means adjusted by BLS 2024 Census-region means",
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "sourceFiles": [SERIES_URL, DATA_URL],
         "regions": regions,
         "notes": [
-            "Peer cohorts are descriptive population means, not recommended budgets.",
-            "BLS suppresses unreliable published estimates; ShareCapsule should not treat a peer mean as a universal target.",
-            "The health engine compares peer patterns with the user's own cash flow, reserves and debt before suggesting a direction.",
+            "Peer cohorts are descriptive estimates, not recommended budgets.",
+            "Automated LABSTAT data do not include BLS cross-tabulations. ShareCapsule regionalizes income-range means using the relative regional mean for each measure.",
+            "BLS publishes exact two-year region-by-income cross-tabulations separately; those can replace this estimate when a controlled refresh source is available.",
+            "The health engine compares peer context with the user's own cash flow, reserves and debt before suggesting a direction.",
         ],
     }
     out = Path("health/benchmarks.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({
-        "sourcePeriod": YEAR,
-        "regions": {key: len(value["cohorts"]) for key, value in regions.items()},
-        "output": str(out),
-    }))
+    print(json.dumps({"sourcePeriod": YEAR, "method": result["benchmarkMethod"], "regions": {key: len(value["cohorts"]) for key, value in regions.items()}, "output": str(out)}))
 
 
 if __name__ == "__main__":
