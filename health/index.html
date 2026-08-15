@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07101d">
+  <meta name="description" content="Compare your locally encrypted spending with households in a similar income range and U.S. region, then get privacy-first financial health actions.">
+  <meta name="robots" content="index,follow">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'none'; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+  <link rel="canonical" href="https://finance.sharecapsule.app/health/">
+  <meta property="og:title" content="Financial Health Benchmark — ShareCapsule Finance">
+  <meta property="og:description" content="Private on-device comparison of your spending with BLS region-and-income peer benchmarks.">
+  <meta property="og:url" content="https://finance.sharecapsule.app/health/">
+  <meta property="og:type" content="website">
+  <title>Financial Health Benchmark — ShareCapsule Finance</title>
+  <link rel="stylesheet" href="./health.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="/">ShareCapsule Finance</a>
+      <nav class="platform-nav" aria-label="Platform navigation">
+        <a href="/">Planner</a>
+        <a href="/guide/">Guide</a>
+        <a class="active" href="/health/">Financial Health</a>
+        <a href="/passive-income/">Income Lab</a>
+        <a href="/about/">Trust Center</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="shell hero-grid">
+        <div>
+          <p class="eyebrow">Private peer benchmarking</p>
+          <h1>How does your spending compare with households like yours?</h1>
+          <p class="lead">Use your encrypted ShareCapsule vault plus public U.S. Bureau of Labor Statistics benchmarks to compare major expense categories by income range and Census region. The peer average is context—not a rule.</p>
+          <div class="privacy-row">
+            <span>✓ Analysis stays on this device</span>
+            <span>✓ No bank credentials</span>
+            <span>✓ Region and income are not uploaded</span>
+          </div>
+        </div>
+        <aside class="hero-card">
+          <strong>Two different answers</strong>
+          <p><b>Peer benchmark</b> shows how a similar BLS cohort spends on average.</p>
+          <p><b>Your health direction</b> considers your cash flow, reserve and high-interest debt before suggesting what to improve.</p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="shell workspace">
+      <section class="panel setup-panel" id="setupPanel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Step 1</p>
+            <h2>Choose your comparison cohort</h2>
+          </div>
+          <span class="status-badge" id="benchmarkStatus">Loading public benchmark…</span>
+        </div>
+        <form id="healthForm" autocomplete="off">
+          <div class="form-grid">
+            <label class="field">
+              <span>State or District</span>
+              <select id="stateSelect" required><option value="">Select state</option></select>
+              <small>Used locally to map you to a Census region.</small>
+            </label>
+            <label class="field">
+              <span>Annual gross household income</span>
+              <input id="annualIncome" type="number" min="1" step="1000" inputmode="numeric" required placeholder="150000">
+              <small>Used only to select the matching BLS income range.</small>
+            </label>
+            <label class="field">
+              <span>Household size <em>optional</em></span>
+              <input id="householdSize" type="number" min="1" max="20" step="1" inputmode="numeric" placeholder="4">
+              <small>Helps explain how closely your household resembles the cohort.</small>
+            </label>
+            <label class="field">
+              <span>Vault passphrase</span>
+              <input id="vaultPassphrase" type="password" autocomplete="off" spellcheck="false" required placeholder="Your existing vault passphrase">
+              <small>Used only in browser memory to decrypt the local vault.</small>
+            </label>
+          </div>
+          <div class="setup-note">The comparison profile is session-only in this version. ShareCapsule does not persist your state, household income, household size, or passphrase from this page.</div>
+          <p class="error" id="formError" role="alert"></p>
+          <button class="primary-button" id="analyzeButton" type="submit">Analyze my financial health</button>
+        </form>
+      </section>
+
+      <section id="results" hidden>
+        <div class="summary-grid">
+          <article class="score-card">
+            <p class="eyebrow">ShareCapsule planning index</p>
+            <div class="score-line"><strong id="healthScore">—</strong><span>/ 100</span></div>
+            <div class="score-label" id="healthLabel">Waiting for analysis</div>
+            <p>This is an educational planning index, not a credit score, underwriting score, or prediction.</p>
+          </article>
+          <article class="summary-card"><span>Peer cohort</span><strong id="peerCohort">—</strong><small id="peerPeople">—</small></article>
+          <article class="summary-card"><span>Your monthly spending</span><strong id="userMonthlySpend">—</strong><small id="trackedPeriod">—</small></article>
+          <article class="summary-card"><span>Peer monthly spending</span><strong id="peerMonthlySpend">—</strong><small id="benchmarkPeriod">—</small></article>
+          <article class="summary-card"><span>Cash reserve</span><strong id="runwayMetric">—</strong><small>Cash assets ÷ tracked monthly spending</small></article>
+          <article class="summary-card"><span>Highest APR</span><strong id="aprMetric">—</strong><small id="aprDetail">—</small></article>
+        </div>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div><p class="eyebrow">Expense allocation</p><h2>You vs. similar households</h2></div>
+            <span class="muted">Shares are of total spending, not gross income.</span>
+          </div>
+          <div class="comparison-list" id="comparisonList"></div>
+          <div class="mapping-note">
+            <strong>Category alignment matters.</strong> ShareCapsule groups your Housing + Utilities against BLS Housing; Groceries + Dining against BLS Food; and compares Transportation, Healthcare and Education directly. Entertainment + Shopping is compared with a broader BLS lifestyle/personal group. Insurance and Travel remain outside direct peer comparison because the current vault categories do not align cleanly with BLS definitions.
+          </div>
+        </section>
+
+        <section class="two-col">
+          <article class="panel">
+            <div class="section-heading"><div><p class="eyebrow">Health direction</p><h2>Top actions</h2></div></div>
+            <div class="actions" id="actionList"></div>
+          </article>
+          <article class="panel">
+            <div class="section-heading"><div><p class="eyebrow">Why this score</p><h2>Health components</h2></div></div>
+            <div class="components" id="scoreComponents"></div>
+          </article>
+        </section>
+
+        <section class="panel methodology-panel">
+          <h2>How to interpret this</h2>
+          <p><strong>Peer average is descriptive.</strong> A household spending less than its peers is not automatically healthier, and spending more is not automatically unhealthy. Healthcare, education, housing, family size and local circumstances can make a higher category appropriate.</p>
+          <p><strong>Health direction is personal.</strong> The action engine puts a recurring deficit, insufficient liquid reserve and high-interest debt ahead of cosmetic category optimization. It limits the action list to the highest-impact items.</p>
+          <p><strong>Source:</strong> U.S. Bureau of Labor Statistics Consumer Expenditure Surveys, region of residence by income-before-taxes cross-tabulated means. <a href="https://www.bls.gov/cex/tables/cross-tab/mean.htm" target="_blank" rel="noopener noreferrer">View the BLS source tables</a>.</p>
+          <div class="method-links"><a href="/methodology/">ShareCapsule methodology</a><a href="/guide/expenses.html">Expense control guide</a><a href="/security/">Security model</a></div>
+        </section>
+
+        <div class="results-actions"><button class="secondary-button" id="changeProfileButton" type="button">Change comparison profile</button><a class="primary-link" href="/">Return to private planner</a></div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="footer"><div class="shell">Educational planning support only. Peer averages are not financial advice or required spending limits. · <a href="/privacy/">Privacy</a> · <a href="/methodology/">Methodology</a> · <a href="/sources/">Sources</a></div></footer>
+  <script src="./health.js?v=20260815-1" defer></script>
+</body>
+</html>
