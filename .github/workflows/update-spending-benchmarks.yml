@@ -21,8 +21,8 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install benchmark dependencies
-        run: python -m pip install --disable-pip-version-check openpyxl requests
-      - name: Build BLS region-income benchmark data
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Build BLS regionalized income-cohort benchmark data
         run: python scripts/update_spending_benchmarks.py
       - name: Validate benchmark output
         run: |
@@ -30,14 +30,17 @@ jobs:
           import json
           from pathlib import Path
           data = json.loads(Path('health/benchmarks.json').read_text())
-          assert data['sourcePeriod'] == '2023-2024'
+          assert data['sourcePeriod'] == '2024'
+          assert data['benchmarkMethod'] == 'regionalized-income-cohort'
+          assert data['isExactCrossTab'] is False
           assert set(data['regions']) == {'northeast','midwest','south','west'}
           for region in data['regions'].values():
               assert len(region['cohorts']) == 9
               for cohort in region['cohorts']:
-                  assert cohort['annualExpenditures'] > 0
-                  assert cohort['housing'] > 0
-                  assert cohort['food'] > 0
+                  assert cohort['annualExpenditures'] and cohort['annualExpenditures'] > 0
+                  assert cohort['housing'] and cohort['housing'] > 0
+                  assert cohort['food'] and cohort['food'] > 0
+                  assert cohort['transportation'] and cohort['transportation'] > 0
           print('Benchmark output validated')
           PY
       - name: Commit refreshed public benchmark data
