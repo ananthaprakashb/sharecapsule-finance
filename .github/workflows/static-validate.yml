@@ -1,0 +1,30 @@
+name: Static publishing validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate static platform
+        run: python3 scripts/validate_static.py
+
+      - name: Check planner JavaScript syntax
+        run: |
+          node --check app.js
+          node --check qr.js
+          node --check sync.js
+
+      - name: Check Income Project Lab JavaScript syntax
+        run: |
+          node --check passive-income/app.js
+          node --check passive-income/focus-guard.js
