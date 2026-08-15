@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - scripts/apply_vault_session.py
+      - scripts/apply_vault_session_v2.py
       - .github/workflows/apply-vault-session.yml
       - vault-session.js
 
@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
 
       - name: Apply guarded patch
-        run: python3 scripts/apply_vault_session.py
+        run: python3 scripts/apply_vault_session_v2.py
 
       - name: Validate patched platform
         run: |
@@ -35,7 +35,7 @@ jobs:
         run: |
           git config user.name "ShareCapsule automation"
           git config user.email "actions@users.noreply.github.com"
-          git add -A
+          git add app.js index.html health/index.html health/health.js guide/focus/index.html scripts/validate_static.py
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
