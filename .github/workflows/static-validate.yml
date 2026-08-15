@@ -25,7 +25,10 @@ jobs:
           node --check sync.js
 
       - name: Check Financial Health JavaScript syntax
-        run: node --check health/health.js
+        run: |
+          node --check health/health.js
+          node --check health/guide-journey.js
+          node --check guide/focus/focus.js
 
       - name: Check Income Project Lab JavaScript syntax
         run: |
