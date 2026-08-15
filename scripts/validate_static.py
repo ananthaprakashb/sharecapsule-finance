@@ -4,6 +4,7 @@ from __future__ import annotations
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlparse
+import json
 import sys
 import xml.etree.ElementTree as ET
 
@@ -19,6 +20,10 @@ REQUIRED = [
     "404.html",
     "SECURITY.md",
     "PUBLISHING.md",
+    "health/index.html",
+    "health/health.css",
+    "health/health.js",
+    "health/benchmarks.json",
     "guide/index.html",
     "guide/expenses.html",
     "guide/credit-cards.html",
@@ -131,6 +136,30 @@ def validate_html(errors: list[str]) -> None:
                 errors.append(f"Broken internal asset/link: {html_file.relative_to(ROOT)} -> {raw}")
 
 
+def validate_benchmarks(errors: list[str]) -> None:
+    try:
+        data = json.loads((ROOT / "health/benchmarks.json").read_text(encoding="utf-8"))
+    except Exception as exc:
+        errors.append(f"Invalid health/benchmarks.json: {exc}")
+        return
+    if data.get("sourcePeriod") != "2023":
+        errors.append("Financial Health benchmark source period must be explicitly 2023")
+    if data.get("benchmarkMethod") != "regionalized-income-quintile":
+        errors.append("Financial Health benchmark method is missing or unexpected")
+    if data.get("isExactCrossTab") is not False:
+        errors.append("Financial Health benchmark must not claim to be an exact BLS cross-tab")
+    if set(data.get("regions", {})) != {"northeast", "midwest", "south", "west"}:
+        errors.append("Financial Health benchmark must contain all four Census regions")
+    for region_name, region in data.get("regions", {}).items():
+        cohorts = region.get("cohorts", [])
+        if len(cohorts) != 5:
+            errors.append(f"Financial Health region {region_name} must contain five income quintiles")
+        for cohort in cohorts:
+            for field in ("annualExpenditures", "housing", "food", "transportation"):
+                if not isinstance(cohort.get(field), (int, float)) or cohort[field] <= 0:
+                    errors.append(f"Financial Health benchmark has invalid {field} in {region_name}/{cohort.get('id')}")
+
+
 def validate_sitemap(errors: list[str]) -> None:
     sitemap = ROOT / "sitemap.xml"
     try:
@@ -157,6 +186,7 @@ def validate_sitemap(errors: list[str]) -> None:
 
     expected_paths = {
         "/",
+        "/health/",
         "/guide/",
         "/guide/expenses.html",
         "/guide/credit-cards.html",
@@ -186,6 +216,7 @@ def main() -> int:
     if not errors:
         validate_domain(errors)
         validate_html(errors)
+        validate_benchmarks(errors)
         validate_sitemap(errors)
 
     if errors:
