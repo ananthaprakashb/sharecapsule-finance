@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07101d">
+  <meta name="description" content="A private, session-only ShareCapsule Finance improvement path generated from your Financial Health results.">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'none'; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+  <title>Your Improvement Focus — ShareCapsule Finance</title>
+  <link rel="stylesheet" href="./focus.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="/">ShareCapsule Finance</a>
+      <nav aria-label="Platform navigation">
+        <a href="/health/">Financial Health</a>
+        <a href="/guide/">Guide</a>
+        <a href="/">Planner</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell page">
+    <section class="hero">
+      <p class="eyebrow">Private improvement journey</p>
+      <h1 id="focusTitle">Your next financial-health focus</h1>
+      <p class="lead">This page uses only the recommendation passed from your Financial Health analysis in this browser tab. It is not stored in the URL or sent to ShareCapsule.</p>
+    </section>
+
+    <section id="focusContent" hidden>
+      <div class="summary-grid">
+        <article class="score-card">
+          <span>Planning index</span>
+          <strong id="scoreValue">—</strong>
+          <small id="scoreLabel">—</small>
+        </article>
+        <article class="reason-card">
+          <p class="eyebrow">Why this guide was highlighted</p>
+          <h2 id="guideName">—</h2>
+          <p id="focusReason">—</p>
+        </article>
+      </div>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Suggested sequence</p>
+            <h2>Work through these steps first</h2>
+          </div>
+          <span class="local-pill">Session-only context</span>
+        </div>
+        <div class="steps" id="focusSteps"></div>
+      </section>
+
+      <section class="panel guardrail">
+        <h2>Use the guide as a decision aid</h2>
+        <p>The highlighted path is based on the financial-health signals currently available in your vault. It does not know every tax, legal, medical, insurance, family or employment detail. Adjust the steps when your real circumstances require it.</p>
+      </section>
+
+      <div class="actions">
+        <a class="primary" id="openGuide" href="/guide/">Open highlighted guide</a>
+        <a class="secondary" href="/health/">Return to Financial Health</a>
+        <button class="secondary" id="clearFocus" type="button">Clear this context</button>
+      </div>
+    </section>
+
+    <section class="panel empty-state" id="emptyState" hidden>
+      <p class="eyebrow">No active health context</p>
+      <h2>Run Financial Health first</h2>
+      <p>This private focus page is populated only after you open a recommended guide from your Financial Health results.</p>
+      <a class="primary" href="/health/">Analyze Financial Health</a>
+    </section>
+  </main>
+
+  <footer class="footer"><div class="shell">Educational planning support only. Personal values shown here remain in this browser tab. · <a href="/privacy/">Privacy</a> · <a href="/methodology/">Methodology</a></div></footer>
+  <script src="./focus.js?v=20260815-1" defer></script>
+</body>
+</html>
