@@ -4,22 +4,35 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
-  <meta name="description" content="A privacy-first personal finance workspace. Financial data is encrypted on your device; optional device sync transfers encrypted vault ciphertext only.">
+  <meta name="description" content="ShareCapsule Finance is a privacy-first financial control platform with an encrypted personal planner, financial education guides, passive-income project tracking and optional encrypted device sync.">
   <meta name="robots" content="index,follow">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://sync.finance.sharecapsule.app; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
   <meta name="referrer" content="no-referrer">
-  <title>Private Finance Planner — ShareCapsule</title>
+  <meta property="og:title" content="ShareCapsule Finance — Private Financial Control">
+  <meta property="og:description" content="Plan, learn and build financial control while keeping readable financial data on your trusted devices.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://finance.sharecapsule.app/">
+  <link rel="canonical" href="https://finance.sharecapsule.app/">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://sync.finance.sharecapsule.app; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+  <title>ShareCapsule Finance — Private Financial Control</title>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./platform.css">
 </head>
 <body>
   <noscript><div class="noscript">This private finance workspace requires JavaScript because encryption and calculations run on your device.</div></noscript>
 
   <header class="site-header">
     <div class="shell header-inner">
-      <a class="brand" href="/" aria-label="ShareCapsule home">
+      <a class="brand" href="/" aria-label="ShareCapsule Finance home">
         <span class="brand-mark" aria-hidden="true">S</span>
-        <span>ShareCapsule</span>
+        <span>ShareCapsule Finance</span>
       </a>
+      <nav class="platform-nav" aria-label="Platform">
+        <a href="/">Planner</a>
+        <a href="/guide/">Guide</a>
+        <a href="/passive-income/">Income Lab</a>
+        <a href="/about/">Trust Center</a>
+        <a href="/roadmap/">Roadmap</a>
+      </nav>
       <div class="header-actions">
         <span class="privacy-pill"><span class="status-dot"></span> Local-only</span>
         <button class="ghost-button" id="lockButton" type="button" hidden>Lock vault</button>
@@ -31,14 +44,19 @@
     <section id="vaultGate" class="gate-section">
       <div class="shell gate-grid">
         <div class="gate-copy">
-          <p class="eyebrow">Private finance by ShareCapsule</p>
+          <p class="eyebrow">Private financial control by ShareCapsule</p>
           <h1>Your money.<br>Your device.<br>Your control.</h1>
-          <p class="lead">Plan income, spending, debt, savings and goals without giving ShareCapsule readable financial data. The vault is encrypted in your browser before it is stored or optionally synchronized.</p>
+          <p class="lead">Plan income, spending, debt, savings and goals without giving ShareCapsule readable financial data. Learn through the Financial Control Guide, build additional income projects, and optionally keep trusted devices synchronized with encrypted ciphertext only.</p>
           <div class="trust-grid" aria-label="Privacy guarantees">
             <div class="trust-card"><strong>Zero readable cloud finance data</strong><span>Local-only is the default. Optional device sync transports encrypted vault ciphertext that the relay cannot decrypt.</span></div>
             <div class="trust-card"><strong>AES-GCM encrypted vault</strong><span>Your vault is unreadable without your passphrase.</span></div>
             <div class="trust-card"><strong>No trackers</strong><span>No analytics, ads, third-party scripts or financial-data aggregation SDKs.</span></div>
             <div class="trust-card"><strong>You own the backup</strong><span>Export an encrypted backup file whenever you want.</span></div>
+          </div>
+          <div class="platform-links" aria-label="Explore ShareCapsule Finance">
+            <a class="platform-link-card" href="/guide/"><strong>Financial Control Guide</strong><span>Credit, expenses, reserves, investing, retirement, protection, taxes and reviews.</span></a>
+            <a class="platform-link-card" href="/passive-income/"><strong>Income Project Lab</strong><span>Choose one realistic income project, track milestones and keep improving after launch.</span></a>
+            <a class="platform-link-card" href="/about/"><strong>Trust Center</strong><span>See methodology, privacy, security, sources and the product roadmap.</span></a>
           </div>
         </div>
 
@@ -120,7 +138,7 @@
     </section>
   </main>
 
-  <footer class="site-footer"><div class="shell footer-inner"><span>Private Finance Planner by ShareCapsule</span><span>Readable financial data stays on your trusted devices.</span></div></footer>
+  <footer class="site-footer"><div class="shell footer-inner"><span>ShareCapsule Finance · Privacy-first financial control</span><span class="footer-links"><a href="/guide/">Guide</a><a href="/passive-income/">Income Lab</a><a href="/about/">About</a><a href="/methodology/">Methodology</a><a href="/privacy/">Privacy</a><a href="/security/">Security</a><a href="/sources/">Sources</a><a href="/roadmap/">Roadmap</a></span></div></footer>
 
   <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden>
   <input id="backupFileInput" type="file" accept=".json,application/json" hidden>
