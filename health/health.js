@@ -2,7 +2,6 @@
   'use strict';
 
   const DB_NAME = 'sharecapsule-private-finance';
-  const DB_VERSION = 1;
   const STORE_NAME = 'vaults';
   const VAULT_ID = 'primary';
   const encoder = new TextEncoder();
@@ -45,7 +44,7 @@
 
   function openDb() {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = indexedDB.open(DB_NAME);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
       request.onupgradeneeded = () => reject(new Error('No finance vault exists on this browser yet. Open the planner and create or pair a vault first.'));
@@ -200,8 +199,8 @@
     comparisons.filter(item => item.status === 'review').forEach(item => {
       const peerAlignedAtUserScale = item.peerShare * stats.monthlyExpenses;
       const difference = Math.max(0, item.userMonthly - peerAlignedAtUserScale);
-      if (item.kind === 'flexible') actions.push({ priority:70 + difference / 1000, title:`Review ${item.label.toLowerCase()}`, detail:`This category is ${pct1.format(item.userShare)} of your tracked spending versus ${pct1.format(item.peerShare)} for the peer cohort. Moving partway toward the peer share could free about ${money.format(difference)} per month; confirm the underlying transactions before changing the budget.` });
-      else if (item.kind === 'structural') actions.push({ priority:60 + difference / 1000, title:`Review structural ${item.label.toLowerCase()} costs`, detail:`Your share is ${pct1.format(item.userShare)} versus ${pct1.format(item.peerShare)} for peers. Look for renewal, housing, vehicle, utility, insurance-linked or financing decisions rather than forcing an immediate short-term cut.` });
+      if (item.kind === 'flexible') actions.push({ priority:70 + difference / 1000, title:`Review ${item.label.toLowerCase()}`, detail:`This category is ${pct1.format(item.userShare)} of your tracked spending versus ${pct1.format(item.peerShare)} for the peer estimate. Moving partway toward the peer share could free about ${money.format(difference)} per month; confirm the underlying transactions before changing the budget.` });
+      else if (item.kind === 'structural') actions.push({ priority:60 + difference / 1000, title:`Review structural ${item.label.toLowerCase()} costs`, detail:`Your share is ${pct1.format(item.userShare)} versus ${pct1.format(item.peerShare)} for the peer estimate. Look for renewal, housing, vehicle, utility, insurance-linked or financing decisions rather than forcing an immediate short-term cut.` });
     });
 
     if (!actions.length && score.cashFlowRate != null && score.cashFlowRate >= .10) actions.push({ priority:40, title:'Protect the monthly margin', detail:`Your recent tracked margin is ${pct1.format(score.cashFlowRate)}. Assign it intentionally across emergency reserves, debt payoff, named goals and long-term investing instead of allowing lifestyle drift.` });
@@ -214,7 +213,7 @@
     $('comparisonList').innerHTML = comparisons.map(item => {
       const userWidth = clamp(item.userShare / maxShare * 100,0,100);
       const peerWidth = clamp(item.peerShare / maxShare * 100,0,100);
-      return `<div class="comparison-row"><div class="comparison-head"><h3>${escapeHtml(item.label)}</h3><div class="comparison-number"><span>You</span><strong>${pct1.format(item.userShare)} · ${money.format(item.userMonthly)}/mo</strong></div><div class="comparison-number"><span>Peer</span><strong>${pct1.format(item.peerShare)} · ${money.format(item.peerMonthly)}/mo</strong></div><span class="signal ${item.status}">${item.statusLabel}</span></div><div class="dual-bar"><div class="bar user" title="Your share"><span style="width:${userWidth.toFixed(1)}%"></span></div><div class="bar" title="Peer share"><span style="width:${peerWidth.toFixed(1)}%"></span></div></div><div class="comparison-note">${escapeHtml(item.note)}</div></div>`;
+      return `<div class="comparison-row"><div class="comparison-head"><h3>${escapeHtml(item.label)}</h3><div class="comparison-number"><span>You</span><strong>${pct1.format(item.userShare)} · ${money.format(item.userMonthly)}/mo</strong></div><div class="comparison-number"><span>Peer estimate</span><strong>${pct1.format(item.peerShare)} · ${money.format(item.peerMonthly)}/mo</strong></div><span class="signal ${item.status}">${item.statusLabel}</span></div><div class="dual-bar"><div class="bar user" title="Your share"><span style="width:${userWidth.toFixed(1)}%"></span></div><div class="bar" title="Peer estimate share"><span style="width:${peerWidth.toFixed(1)}%"></span></div></div><div class="comparison-note">${escapeHtml(item.note)}</div></div>`;
     }).join('');
   }
 
@@ -242,11 +241,11 @@
     $('healthLabel').textContent = score.label;
     $('peerCohort').textContent = `${region.name} · ${cohort.label}`;
     const people = Number(cohort.averagePeople);
-    $('peerPeople').textContent = Number.isFinite(people) && people > 0 ? `Peer consumer unit averages ${people.toFixed(1)} people${householdSize ? ` · your household: ${householdSize}` : ''}` : 'Household-size comparison unavailable';
+    $('peerPeople').textContent = Number.isFinite(people) && people > 0 ? `Estimated peer consumer unit averages ${people.toFixed(1)} people${householdSize ? ` · your household: ${householdSize}` : ''}` : 'Household-size comparison unavailable';
     $('userMonthlySpend').textContent = money.format(stats.monthlyExpenses);
     $('trackedPeriod').textContent = `${stats.monthsObserved} observed month${stats.monthsObserved === 1 ? '' : 's'} in the last 90 days · ${stats.transactionCount} transactions`;
     $('peerMonthlySpend').textContent = money.format((Number(cohort.annualExpenditures)||0)/12);
-    $('benchmarkPeriod').textContent = `BLS ${benchmarks.sourcePeriod} two-year mean`;
+    $('benchmarkPeriod').textContent = `BLS ${benchmarks.sourcePeriod} inputs · ShareCapsule regionalized estimate`;
     $('runwayMetric').textContent = score.runway == null ? '—' : `${score.runway.toFixed(1)} mo`;
     const apr = Number(balances.highestAprDebt?.apr) || 0;
     $('aprMetric').textContent = balances.highestAprDebt ? `${apr.toFixed(2)}%` : 'None entered';
@@ -296,13 +295,13 @@
       const response = await fetch('./benchmarks.json', { cache:'no-store', credentials:'same-origin' });
       if (!response.ok) throw new Error(`Benchmark HTTP ${response.status}`);
       const data = await response.json();
-      if (!data?.regions?.west || !data?.sourcePeriod) throw new Error('Benchmark file is incomplete');
+      if (!data?.regions?.west || !data?.sourcePeriod || data?.isExactCrossTab !== false) throw new Error('Benchmark file is incomplete or mislabeled');
       benchmarks = data;
-      $('benchmarkStatus').textContent = `BLS ${data.sourcePeriod} benchmark ready`;
+      $('benchmarkStatus').textContent = `BLS ${data.sourcePeriod} regionalized peer estimate ready`;
     } catch (error) {
       console.error(error);
-      $('benchmarkStatus').textContent = 'Benchmark refresh pending';
-      $('benchmarkStatus').title = 'The public BLS benchmark file has not been generated yet.';
+      $('benchmarkStatus').textContent = 'Benchmark unavailable';
+      $('benchmarkStatus').title = 'The public BLS-based benchmark file could not be loaded.';
     }
   }
 
