@@ -8,6 +8,7 @@ import openpyxl
 import requests
 
 YEAR = "2023-2024"
+INDEX_URL = "https://www.bls.gov/cex/tables/cross-tab/mean.htm"
 REGIONS = {
     "northeast": "Northeast",
     "midwest": "Midwest",
@@ -42,6 +43,13 @@ FIELDS = {
     "personal insurance and pensions": "personalInsurancePensions",
 }
 
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+}
+
 
 def text(value):
     return re.sub(r"\s+", " ", str(value or "").strip()).lower()
@@ -72,15 +80,28 @@ def find_field(rows, needle):
                 matches.append((label, nums))
     if not matches:
         raise RuntimeError(f"Could not find row for {needle!r}")
-    # Prefer the shortest matching label; this avoids subcategory rows when possible.
     matches.sort(key=lambda item: len(item[0]))
     return matches[0][1]
 
 
-def extract_region(slug, region_name):
+def open_bls_session():
+    session = requests.Session()
+    session.headers.update(BROWSER_HEADERS)
+    warm = session.get(INDEX_URL, timeout=60)
+    warm.raise_for_status()
+    return session
+
+
+def extract_region(session, slug, region_name):
     url = f"https://www.bls.gov/cex/tables/cross-tab/mean/cu-region-by-income-{slug}-{YEAR}.xlsx"
-    response = requests.get(url, timeout=60, headers={"User-Agent": "ShareCapsule-Finance-Benchmark-Refresh/1.0"})
+    headers = {
+        "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream;q=0.9,*/*;q=0.8",
+        "Referer": INDEX_URL,
+    }
+    response = session.get(url, timeout=60, headers=headers)
     response.raise_for_status()
+    if not response.content.startswith(b"PK"):
+        raise RuntimeError(f"BLS did not return an Excel workbook for {region_name}")
     workbook = openpyxl.load_workbook(io.BytesIO(response.content), data_only=True)
     sheet = workbook[workbook.sheetnames[0]]
     rows = list(sheet.iter_rows(values_only=True))
@@ -90,7 +111,6 @@ def extract_region(slug, region_name):
     for index, band in enumerate(BANDS, start=1):
         cohort = dict(band)
         for field, values in extracted.items():
-            # BLS rows contain Total Region plus nine income bands. Skip Total Region.
             cohort[field] = values[index]
         cohorts.append(cohort)
 
@@ -102,7 +122,8 @@ def extract_region(slug, region_name):
 
 
 def main():
-    regions = {slug: extract_region(slug, name) for slug, name in REGIONS.items()}
+    session = open_bls_session()
+    regions = {slug: extract_region(session, slug, name) for slug, name in REGIONS.items()}
     result = {
         "schemaVersion": 1,
         "source": "U.S. Bureau of Labor Statistics Consumer Expenditure Surveys",
