@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07101d">
-  <meta name="description" content="Compare your locally encrypted spending with households in a similar income range and U.S. region, then get privacy-first financial health actions.">
+  <meta name="description" content="Compare your locally encrypted spending with a regionalized peer estimate built from U.S. Bureau of Labor Statistics income and regional spending tables, then get privacy-first financial health actions.">
   <meta name="robots" content="index,follow">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'none'; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
   <link rel="canonical" href="https://finance.sharecapsule.app/health/">
   <meta property="og:title" content="Financial Health Benchmark — ShareCapsule Finance">
-  <meta property="og:description" content="Private on-device comparison of your spending with BLS region-and-income peer benchmarks.">
+  <meta property="og:description" content="Private on-device comparison of your spending with a transparent BLS-based regional and income peer estimate.">
   <meta property="og:url" content="https://finance.sharecapsule.app/health/">
   <meta property="og:type" content="website">
   <title>Financial Health Benchmark — ShareCapsule Finance</title>
@@ -36,7 +36,7 @@
         <div>
           <p class="eyebrow">Private peer benchmarking</p>
           <h1>How does your spending compare with households like yours?</h1>
-          <p class="lead">Use your encrypted ShareCapsule vault plus public U.S. Bureau of Labor Statistics benchmarks to compare major expense categories by income range and Census region. The peer average is context—not a rule.</p>
+          <p class="lead">Use your encrypted ShareCapsule vault plus public U.S. Bureau of Labor Statistics spending data to compare major expense categories for a similar income level and Census region. The peer estimate is context—not a rule or a required budget.</p>
           <div class="privacy-row">
             <span>✓ Analysis stays on this device</span>
             <span>✓ No bank credentials</span>
@@ -45,7 +45,7 @@
         </div>
         <aside class="hero-card">
           <strong>Two different answers</strong>
-          <p><b>Peer benchmark</b> shows how a similar BLS cohort spends on average.</p>
+          <p><b>Peer estimate</b> shows an income-and-region spending pattern derived from BLS public tables.</p>
           <p><b>Your health direction</b> considers your cash flow, reserve and high-interest debt before suggesting what to improve.</p>
         </aside>
       </div>
@@ -70,12 +70,12 @@
             <label class="field">
               <span>Annual gross household income</span>
               <input id="annualIncome" type="number" min="1" step="1000" inputmode="numeric" required placeholder="150000">
-              <small>Used only to select the matching BLS income range.</small>
+              <small>Used only to select the matching BLS income quintile.</small>
             </label>
             <label class="field">
               <span>Household size <em>optional</em></span>
               <input id="householdSize" type="number" min="1" max="20" step="1" inputmode="numeric" placeholder="4">
-              <small>Helps explain how closely your household resembles the cohort.</small>
+              <small>Helps explain how closely your household resembles the peer estimate.</small>
             </label>
             <label class="field">
               <span>Vault passphrase</span>
@@ -99,7 +99,7 @@
           </article>
           <article class="summary-card"><span>Peer cohort</span><strong id="peerCohort">—</strong><small id="peerPeople">—</small></article>
           <article class="summary-card"><span>Your monthly spending</span><strong id="userMonthlySpend">—</strong><small id="trackedPeriod">—</small></article>
-          <article class="summary-card"><span>Peer monthly spending</span><strong id="peerMonthlySpend">—</strong><small id="benchmarkPeriod">—</small></article>
+          <article class="summary-card"><span>Peer monthly estimate</span><strong id="peerMonthlySpend">—</strong><small id="benchmarkPeriod">—</small></article>
           <article class="summary-card"><span>Cash reserve</span><strong id="runwayMetric">—</strong><small>Cash assets ÷ tracked monthly spending</small></article>
           <article class="summary-card"><span>Highest APR</span><strong id="aprMetric">—</strong><small id="aprDetail">—</small></article>
         </div>
@@ -128,9 +128,10 @@
 
         <section class="panel methodology-panel">
           <h2>How to interpret this</h2>
-          <p><strong>Peer average is descriptive.</strong> A household spending less than its peers is not automatically healthier, and spending more is not automatically unhealthy. Healthcare, education, housing, family size and local circumstances can make a higher category appropriate.</p>
+          <p><strong>Peer spending is descriptive.</strong> A household spending less than its peers is not automatically healthier, and spending more is not automatically unhealthy. Healthcare, education, housing, family size and local circumstances can make a higher category appropriate.</p>
           <p><strong>Health direction is personal.</strong> The action engine puts a recurring deficit, insufficient liquid reserve and high-interest debt ahead of cosmetic category optimization. It limits the action list to the highest-impact items.</p>
-          <p><strong>Source:</strong> U.S. Bureau of Labor Statistics Consumer Expenditure Surveys, region of residence by income-before-taxes cross-tabulated means. <a href="https://www.bls.gov/cex/tables/cross-tab/mean.htm" target="_blank" rel="noopener noreferrer">View the BLS source tables</a>.</p>
+          <p><strong>Benchmark method:</strong> ShareCapsule starts with BLS 2023 national income-quintile spending means and adjusts each category using the corresponding BLS 2023 Census-region-to-U.S. spending ratio. This produces a transparent regionalized income peer estimate. <strong>It is not the official BLS region × income cross-tabulation.</strong> BLS publishes exact two-year cross-tabulated tables separately.</p>
+          <p><strong>Source:</strong> U.S. Bureau of Labor Statistics Consumer Expenditure Surveys 2023 annual report and CE tables. <a href="https://www.bls.gov/opub/reports/consumer-expenditures/2023/home.htm" target="_blank" rel="noopener noreferrer">View the BLS 2023 report</a>.</p>
           <div class="method-links"><a href="/methodology/">ShareCapsule methodology</a><a href="/guide/expenses.html">Expense control guide</a><a href="/security/">Security model</a></div>
         </section>
 
@@ -139,7 +140,7 @@
     </section>
   </main>
 
-  <footer class="footer"><div class="shell">Educational planning support only. Peer averages are not financial advice or required spending limits. · <a href="/privacy/">Privacy</a> · <a href="/methodology/">Methodology</a> · <a href="/sources/">Sources</a></div></footer>
-  <script src="./health.js?v=20260815-1" defer></script>
+  <footer class="footer"><div class="shell">Educational planning support only. Peer estimates are not financial advice or required spending limits. · <a href="/privacy/">Privacy</a> · <a href="/methodology/">Methodology</a> · <a href="/sources/">Sources</a></div></footer>
+  <script src="./health.js?v=20260815-2" defer></script>
 </body>
 </html>
