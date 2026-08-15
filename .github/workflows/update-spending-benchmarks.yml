@@ -1,0 +1,53 @@
+name: Update spending benchmarks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 8 15 1,4,7,10 *'
+  push:
+    paths:
+      - scripts/update_spending_benchmarks.py
+      - .github/workflows/update-spending-benchmarks.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install benchmark dependencies
+        run: python -m pip install --disable-pip-version-check openpyxl requests
+      - name: Build BLS region-income benchmark data
+        run: python scripts/update_spending_benchmarks.py
+      - name: Validate benchmark output
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('health/benchmarks.json').read_text())
+          assert data['sourcePeriod'] == '2023-2024'
+          assert set(data['regions']) == {'northeast','midwest','south','west'}
+          for region in data['regions'].values():
+              assert len(region['cohorts']) == 9
+              for cohort in region['cohorts']:
+                  assert cohort['annualExpenditures'] > 0
+                  assert cohort['housing'] > 0
+                  assert cohort['food'] > 0
+          print('Benchmark output validated')
+          PY
+      - name: Commit refreshed public benchmark data
+        run: |
+          if git diff --quiet -- health/benchmarks.json && git ls-files --error-unmatch health/benchmarks.json >/dev/null 2>&1; then
+            echo "No benchmark changes"
+            exit 0
+          fi
+          git config user.name "sharecapsule-benchmark-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add health/benchmarks.json
+          git commit -m "Refresh BLS spending benchmarks"
+          git push
