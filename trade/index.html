@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07101d">
+  <meta name="description" content="Privacy-first ticker monitoring with market-moving news sentiment and SEC filings.">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://finance-market.sharecapsule.org; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+  <title>Ticker Watch — ShareCapsule Finance</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar"><div class="shell topbar-inner"><a class="brand" href="/">ShareCapsule Finance</a><div class="top-actions"><span class="privacy-pill">Watchlist stays on device</span><a class="back" href="/">Finance home</a></div></div></header>
+  <main class="shell main">
+    <section class="hero"><div><p class="eyebrow">Private Ticker Watch</p><h1>Watch the ticker.<br>Understand the catalyst.</h1><p class="lead">Add companies you care about and review recent ticker-linked news, possible positive or negative direction, event significance, and SEC filings without uploading your portfolio or holdings.</p></div><div class="guardrail"><strong>Research, not a trade signal.</strong><span>Direction describes news sentiment for the company. Potential impact describes event significance. Neither predicts whether the stock price will rise or fall.</span></div></section>
+    <section class="panel add-panel"><form id="tickerForm" class="ticker-form" autocomplete="off"><label><span>Add preferred U.S. ticker</span><input id="tickerInput" inputmode="latin" maxlength="10" spellcheck="false" placeholder="AAPL" required></label><button type="submit">Add to watchlist</button></form><p id="status" class="status">Only the selected ticker symbol is sent to the public-market gateway when you request a refresh. Your financial vault is never sent.</p></section>
+    <section class="watch-section"><div class="section-head"><div><p class="eyebrow">Device-local watchlist</p><h2>Preferred tickers</h2></div><button id="refreshSelected" class="secondary" type="button">Refresh selected</button></div><div id="watchlist" class="watchlist"></div></section>
+    <section id="detail" class="detail" hidden>
+      <article class="panel quote-panel"><div class="quote-head"><div><p class="eyebrow" id="companyName">Selected company</p><h2 id="tickerName">—</h2></div><div class="quote-price"><strong id="lastPrice">—</strong><span id="dayChange">—</span></div></div><div class="quote-grid"><div><span>Day open</span><strong id="dayOpen">—</strong></div><div><span>Day high</span><strong id="dayHigh">—</strong></div><div><span>Day low</span><strong id="dayLow">—</strong></div><div><span>Volume</span><strong id="dayVolume">—</strong></div></div><p class="market-note" id="marketNote"></p></article>
+      <article class="panel tone-panel"><div class="tone-heading"><div><p class="eyebrow">Recent ticker-linked coverage</p><h2 id="toneLabel">News tone</h2><p class="market-note" id="toneBasis">Waiting for recent news.</p></div><div class="tone-score"><span>Tone index</span><strong id="toneScore">0</strong><small>-100 negative · +100 positive</small></div></div><div class="tone-grid"><div class="tone-stat positive"><span>Possible positive</span><strong id="tonePositive">0</strong></div><div class="tone-stat negative"><span>Possible negative</span><strong id="toneNegative">0</strong></div><div class="tone-stat neutral"><span>Neutral / mixed</span><strong id="toneNeutral">0</strong></div><div class="tone-stat high"><span>High-impact stories</span><strong id="toneHigh">0</strong></div></div></article>
+      <div class="two-col"><section><div class="section-head compact"><div><p class="eyebrow">Potential catalysts</p><h2>News that may matter</h2></div></div><div class="news-filters" id="newsFilters"><button class="filter-button active" type="button" data-filter="all">All</button><button class="filter-button" type="button" data-filter="positive">Possible positive</button><button class="filter-button" type="button" data-filter="negative">Possible negative</button><button class="filter-button" type="button" data-filter="high">High impact</button></div><div id="newsList" class="feed"></div></section><section><div class="section-head compact"><div><p class="eyebrow">Primary source</p><h2>Recent SEC filings</h2></div></div><div id="filingList" class="feed"></div></section></div>
+    </section>
+  </main>
+  <footer class="footer"><div class="shell">Ticker Watch is an educational research tool. News direction and impact labels are research aids, not predictions or recommendations. Verify material information at the original source before making a financial decision.</div></footer>
+  <script src="./app.js" defer></script>
+</body>
+</html>
