@@ -20,13 +20,26 @@
     });
   }
 
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = false;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error(`Could not load ${src}`));
+      document.head.appendChild(script);
+    });
+  }
+
   async function start() {
     for (let attempt = 0; attempt < 50; attempt++) {
       if (await keyExists()) {
-        const script = document.createElement('script');
-        script.src = './sync.js';
-        script.defer = true;
-        document.head.appendChild(script);
+        try {
+          await loadScript('./sync.js');
+          await loadScript('./sync-collapse.js');
+        } catch (error) {
+          console.warn('Ticker Watch sync UI could not be started.', error);
+        }
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
