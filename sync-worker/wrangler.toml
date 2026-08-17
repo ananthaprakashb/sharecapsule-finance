@@ -1,9 +1,9 @@
 name = "sharecapsule-finance-sync"
 main = "src/index.js"
-compatibility_date = "2026-08-09"
+compatibility_date = "2026-08-16"
 
 [vars]
-APP_ORIGIN = "https://finance.sharecapsule.app"
+APP_ORIGIN = "https://finance.sharecapsule.org"
 
 [[d1_databases]]
 binding = "DB"
@@ -12,5 +12,5 @@ database_id = "e1b6c7c3-8566-41af-9936-f02568067b42"
 migrations_dir = "migrations"
 
 [[routes]]
-pattern = "sync.finance.sharecapsule.app"
+pattern = "sync.finance.sharecapsule.org"
 custom_domain = true
