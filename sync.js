@@ -8,7 +8,7 @@
   const CONFIG_ID = 'sync-config';
   const DEVICE_KEY_ID = 'sync-device-key';
   const PENDING_ID = 'sync-pending';
-  const SYNC_ENDPOINT = 'https://sync.finance.sharecapsule.app';
+  const SYNC_ENDPOINT = 'https://sync.finance.sharecapsule.org';
   const SYNC_INTERVAL_MS = 10000;
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
