@@ -4,12 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07101d">
-  <meta name="description" content="Privacy-first ticker monitoring with market-moving news sentiment, SEC filings, and encrypted device sync.">
+  <meta name="description" content="Privacy-first ticker monitoring with market-moving news sentiment, SEC filings, encrypted device sync, and personalized audio briefings.">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://finance-market.sharecapsule.org https://sync.finance.sharecapsule.org; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
   <title>Ticker Watch — ShareCapsule Finance</title>
   <link rel="stylesheet" href="./styles.css">
   <link rel="stylesheet" href="./sync.css">
+  <link rel="stylesheet" href="./briefing.css">
 </head>
 <body>
   <header class="topbar">
@@ -21,7 +22,7 @@
 
   <main class="shell main">
     <section class="hero">
-      <div><p class="eyebrow">Private Ticker Watch</p><h1>Watch the ticker.<br>Understand the catalyst.</h1><p class="lead">Add companies you care about and review recent ticker-linked news, possible positive or negative direction, event significance, and SEC filings without uploading your portfolio or holdings.</p></div>
+      <div><p class="eyebrow">Private Ticker Watch</p><h1>Watch the ticker.<br>Understand the catalyst.</h1><p class="lead">Add companies you care about and review recent ticker-linked news, possible positive or negative direction, event significance, SEC filings, and a personalized audio briefing without uploading your portfolio or holdings.</p></div>
       <div class="guardrail"><strong>Research, not a trade signal.</strong><span>Direction describes news sentiment for the company. Potential impact describes event significance. Neither predicts whether the stock price will rise or fall.</span></div>
     </section>
 
@@ -62,12 +63,34 @@
     <section id="detail" class="detail" hidden>
       <article class="panel quote-panel"><div class="quote-head"><div><p class="eyebrow" id="companyName">Selected company</p><h2 id="tickerName">—</h2></div><div class="quote-price"><strong id="lastPrice">—</strong><span id="dayChange">—</span></div></div><div class="quote-grid"><div><span>Day open</span><strong id="dayOpen">—</strong></div><div><span>Day high</span><strong id="dayHigh">—</strong></div><div><span>Day low</span><strong id="dayLow">—</strong></div><div><span>Volume</span><strong id="dayVolume">—</strong></div></div><p class="market-note" id="marketNote"></p></article>
       <article class="panel tone-panel"><div class="tone-heading"><div><p class="eyebrow">Recent ticker-linked coverage</p><h2 id="toneLabel">News tone</h2><p class="market-note" id="toneBasis">Waiting for recent news.</p></div><div class="tone-score"><span>Tone index</span><strong id="toneScore">0</strong><small>-100 negative · +100 positive</small></div></div><div class="tone-grid"><div class="tone-stat positive"><span>Possible positive</span><strong id="tonePositive">0</strong></div><div class="tone-stat negative"><span>Possible negative</span><strong id="toneNegative">0</strong></div><div class="tone-stat neutral"><span>Neutral / mixed</span><strong id="toneNeutral">0</strong></div><div class="tone-stat high"><span>High-impact stories</span><strong id="toneHigh">0</strong></div></div></article>
+
+      <article class="panel briefing-panel" aria-labelledby="briefingTitle">
+        <div class="briefing-heading">
+          <div><p class="eyebrow">Personalized podcast</p><h2 id="briefingTitle">Listen to the news briefing</h2><p class="briefing-kicker">Hear the important stories first, then open only the articles you want to understand in depth. High-impact and directional stories are prioritized in the spoken briefing.</p></div>
+          <span id="briefingProgress" class="briefing-progress">0 / 0</span>
+        </div>
+        <div class="briefing-controls">
+          <button id="briefingPlay" class="briefing-play" type="button" disabled>Generate & play</button>
+          <button id="briefingPause" class="secondary" type="button" disabled>Pause</button>
+          <button id="briefingStop" class="secondary" type="button" disabled>Stop</button>
+          <label class="briefing-select"><span>Speed</span><select id="briefingRate"><option value="0.9">0.9×</option><option value="1" selected>1.0×</option><option value="1.15">1.15×</option><option value="1.3">1.3×</option><option value="1.5">1.5×</option></select></label>
+          <label class="briefing-select"><span>Voice</span><select id="briefingVoice"><option value="">Browser voice</option></select><small id="briefingVoiceNote" class="briefing-voice-note"></small></label>
+        </div>
+        <p id="briefingStatus" class="briefing-status">Waiting for ticker news.</p>
+        <div class="briefing-privacy">The briefing is assembled in this browser from headlines, summaries, sentiment context and impact labels already displayed on this page. ShareCapsule makes no additional content request for playback. A local system voice is preferred when the browser reports one; otherwise the browser's default speech service may be local or remote.</div>
+        <div class="briefing-transcript-wrap">
+          <div class="briefing-transcript-head"><h3>Briefing transcript & sources</h3><span class="briefing-progress">Read deeper when something matters</span></div>
+          <div id="briefingTranscript" class="briefing-transcript"><div class="briefing-empty">Load a ticker to create a personalized audio briefing.</div></div>
+        </div>
+      </article>
+
       <div class="two-col"><section><div class="section-head compact"><div><p class="eyebrow">Potential catalysts</p><h2>News that may matter</h2></div></div><div class="news-filters" id="newsFilters"><button class="filter-button active" type="button" data-filter="all">All</button><button class="filter-button" type="button" data-filter="positive">Possible positive</button><button class="filter-button" type="button" data-filter="negative">Possible negative</button><button class="filter-button" type="button" data-filter="high">High impact</button></div><div id="newsList" class="feed"></div></section><section><div class="section-head compact"><div><p class="eyebrow">Primary source</p><h2>Recent SEC filings</h2></div></div><div id="filingList" class="feed"></div></section></div>
     </section>
   </main>
 
-  <footer class="footer"><div class="shell">Ticker Watch is an educational research tool. News direction and impact labels are research aids, not predictions or recommendations. Verify material information at the original source before making a financial decision.</div></footer>
+  <footer class="footer"><div class="shell">Ticker Watch is an educational research tool. News direction, impact labels and audio briefings are research aids, not predictions or recommendations. Verify material information at the original source before making a financial decision.</div></footer>
   <script src="./app.js" defer></script>
+  <script src="./briefing.js" defer></script>
   <script src="../qr.js" defer></script>
   <script src="./qr-pairing.js" defer></script>
   <script src="./sync-loader.js" defer></script>
