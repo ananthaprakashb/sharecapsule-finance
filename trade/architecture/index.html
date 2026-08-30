@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07101d">
+  <meta name="description" content="Technical architecture of ShareCapsule Ticker Watch: local-first watchlists, encrypted sync, minimal ticker requests, source-linked market evidence, catalyst context, and browser-based briefings.">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://finance.sharecapsule.org/trade/architecture/">
+  <link rel="icon" type="image/png" href="/assets/golden-hand-growth-prosperity.png">
+  <meta property="og:title" content="Ticker Watch Architecture — ShareCapsule Finance">
+  <meta property="og:description" content="See how Ticker Watch minimizes portfolio data collection while turning public market evidence into source-linked research.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://finance.sharecapsule.org/trade/architecture/">
+  <meta property="og:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta property="og:image:alt" content="Golden hand holding coins below a rising green growth arrow, ShareCapsule Finance">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Ticker Watch Architecture — ShareCapsule Finance">
+  <meta name="twitter:description" content="Privacy-first market research architecture with minimal data collection, encrypted sync, evidence provenance, and browser briefings.">
+  <meta name="twitter:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; connect-src 'none'; script-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Ticker Watch Architecture — ShareCapsule Finance</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="../how-it-works/styles.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="/"><img class="brand-mark" src="/assets/golden-hand-growth-prosperity.png" alt=""><span>ShareCapsule Finance</span></a>
+      <nav class="top-actions" aria-label="Ticker Watch navigation">
+        <a class="nav-link" href="/trade/how-it-works/">How it works</a>
+        <a class="nav-link current" href="/trade/architecture/">Architecture</a>
+        <a class="nav-link" href="/security/">Security</a>
+        <a class="nav-cta" href="/trade/">Open Ticker Watch</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="architecture-hero shell">
+      <div>
+        <p class="eyebrow">Technical architecture</p>
+        <h1>Build useful market research.<br>Know less about the investor.</h1>
+        <p class="lead">Ticker Watch is designed around a simple boundary: the research service needs to know which public company you asked about, not the size and composition of your brokerage portfolio. The architecture combines local-first preferences, encrypted device sync, public-market evidence, source-linked interpretation, and browser-generated briefings.</p>
+        <div class="hero-actions">
+          <a class="primary-link" href="/trade/">Open Ticker Watch</a>
+          <a class="secondary-link" href="#request-lifecycle">Follow one request</a>
+        </div>
+      </div>
+      <div class="logo-showcase"><img src="/assets/golden-hand-growth-prosperity.png" alt="Golden hand holding coins below a rising green growth arrow"></div>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro narrow">
+        <p class="eyebrow">System overview</p>
+        <h2>Five layers, with an explicit data boundary at each step.</h2>
+        <p>The architecture is intentionally easier to explain than a black-box recommendation engine. Each layer has a narrow responsibility, and the user can move from interpretation back to evidence.</p>
+      </div>
+      <div class="flow-grid" aria-label="Ticker Watch system flow">
+        <article class="flow-step"><small>Layer 1</small><h3>User device</h3><p>Stores the local watchlist experience and the user's trusted-device state. The product does not require brokerage holdings to start research.</p><span class="boundary">private preference layer</span></article>
+        <article class="flow-step"><small>Layer 2</small><h3>Selected ticker request</h3><p>When the user refreshes a company, the public-market request can be scoped to the selected ticker rather than the user's full financial profile.</p><span class="boundary">minimal request payload</span></article>
+        <article class="flow-step"><small>Layer 3</small><h3>Market gateway</h3><p>Coordinates the public information needed for the selected company and returns a normalized research payload to the browser.</p><span class="boundary">public-market services</span></article>
+        <article class="flow-step"><small>Layer 4</small><h3>Evidence + context</h3><p>Recent news, SEC filings, direction context and event significance are organized while preserving links back to the underlying evidence.</p><span class="boundary">explainable research</span></article>
+        <article class="flow-step"><small>Layer 5</small><h3>Browser research view</h3><p>The user reviews catalysts and filings, filters what matters, and can generate an audio briefing from the research already displayed.</p><span class="boundary">decision-support interface</span></article>
+      </div>
+    </section>
+
+    <section class="section-band shell" id="request-lifecycle">
+      <div class="section-intro narrow">
+        <p class="eyebrow">One request, end to end</p>
+        <h2>What happens when a user refreshes NVDA?</h2>
+        <p>The most important architectural principle is data minimization before encryption: do not collect information a research request does not need.</p>
+      </div>
+      <div class="request-list">
+        <div class="request-row"><div><strong>User selects NVDA.</strong><p>The user's full watchlist, holdings, position size and brokerage account are not required to answer the request.</p></div><em>browser</em></div>
+        <div class="request-row"><div><strong>The ticker symbol is requested.</strong><p>The browser sends the selected public ticker to the market gateway when the user asks for a refresh.</p></div><em>minimal boundary</em></div>
+        <div class="request-row"><div><strong>Public evidence is gathered.</strong><p>The gateway retrieves the market information needed for the ticker, including recent coverage and filing information supported by the current product.</p></div><em>market services</em></div>
+        <div class="request-row"><div><strong>Evidence is normalized.</strong><p>The result is returned in a shape the client can consistently render and compare rather than exposing provider-specific structures throughout the UI.</p></div><em>gateway</em></div>
+        <div class="request-row"><div><strong>Context is shown beside the source.</strong><p>Direction describes company-news tone; impact describes event significance. The user can open the original story or filing.</p></div><em>research layer</em></div>
+        <div class="request-row"><div><strong>The browser can build the briefing.</strong><p>The spoken briefing is assembled from the headlines, summaries and labels already displayed. No additional ShareCapsule content request is required merely to create the transcript.</p></div><em>browser</em></div>
+      </div>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro narrow">
+        <p class="eyebrow">Data boundaries</p>
+        <h2>What each part of the system needs to know.</h2>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Data</th><th>Primary location</th><th>Market research service needs it?</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Selected ticker</strong></td><td>Browser → market gateway on refresh</td><td><span class="yes">Yes</span></td><td>It identifies the public company for which research was requested.</td></tr>
+          <tr><td><strong>Full watchlist</strong></td><td>User-device experience; optional encrypted sync</td><td><span class="no">No</span></td><td>A single-company research request does not need the user's entire preference set.</td></tr>
+          <tr><td><strong>Portfolio holdings</strong></td><td>Not required by Ticker Watch</td><td><span class="no">No</span></td><td>Company evidence can be presented without collecting share counts or portfolio value.</td></tr>
+          <tr><td><strong>Vault passphrase / sync key</strong></td><td>Trusted device boundary</td><td><span class="no">No</span></td><td>The sync relay is not intended to receive the finance vault passphrase or readable watchlist encryption key.</td></tr>
+          <tr><td><strong>Public news / filings</strong></td><td>Market evidence pipeline and browser result</td><td><span class="yes">Yes</span></td><td>These are the evidence objects the research experience is built to help the user inspect.</td></tr>
+          <tr><td><strong>Briefing transcript</strong></td><td>Browser-generated from displayed research</td><td><span class="no">No additional request</span></td><td>The current briefing can be assembled from content already present in the page.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro narrow">
+        <p class="eyebrow">Privacy architecture</p>
+        <h2>Minimize first. Encrypt the state that still needs to move.</h2>
+      </div>
+      <div class="layer-grid">
+        <article class="layer-card"><p class="eyebrow">Local preference layer</p><h3>Encrypted watchlist</h3><p>Ticker preferences are part of the privacy-first browser experience. Optional cross-device synchronization is designed around ciphertext rather than a readable watchlist database.</p><ul><li>AES-GCM encrypted sync payload.</li><li>Relay is not intended to read ticker symbols inside the encrypted payload.</li><li>Readable state exists on the trusted device when needed by the UI.</li></ul></article>
+        <article class="layer-card"><p class="eyebrow">Trusted-device layer</p><h3>One-time pairing</h3><p>Pairing is separated from the public market research request. A short-lived pairing capability is used to connect another trusted device without turning the relay into the keeper of the vault passphrase.</p><ul><li>Short-lived pairing capability.</li><li>Separate sync authorization.</li><li>Revision/conflict handling avoids silent overwrite assumptions.</li></ul></article>
+        <article class="layer-card"><p class="eyebrow">Public research layer</p><h3>Minimal market requests</h3><p>Only the company the user asks to research needs to cross the public-market boundary for that request. This is a design choice, not merely a privacy-policy statement.</p><ul><li>No brokerage login required for Ticker Watch.</li><li>No position size required.</li><li>No full portfolio needed to retrieve company research.</li></ul></article>
+        <article class="layer-card"><p class="eyebrow">Presentation layer</p><h3>Browser-generated briefing</h3><p>The browser turns the already-displayed research into a spoken sequence, prioritizing the stories the UI has identified as significant or directional.</p><ul><li>Transcript assembled from displayed items.</li><li>Original sources remain visible.</li><li>Local system voice is preferred when the browser reports one.</li></ul></article>
+      </div>
+      <p class="security-link">Cryptographic details and limitations are documented separately in the <a href="/security/">published security model</a>.</p>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro narrow">
+        <p class="eyebrow">Explainability boundary</p>
+        <h2>Evidence, interpretation and prediction are different things.</h2>
+        <p>Ticker Watch is deliberately structured so that a user can inspect the distinction instead of receiving one opaque “AI score.”</p>
+      </div>
+      <div class="evidence-stack">
+        <article class="evidence-card"><span>1</span><h3>Evidence</h3><p>A news story, filing or other public-market item associated with the selected company.</p></article>
+        <article class="evidence-card"><span>2</span><h3>Direction</h3><p>A description of whether the recent coverage appears potentially positive, negative or neutral/mixed for the company.</p></article>
+        <article class="evidence-card"><span>3</span><h3>Impact</h3><p>An estimate of event significance used to help prioritize reading. High impact does not mean high expected return.</p></article>
+        <article class="evidence-card"><span>4</span><h3>Source</h3><p>A path back to the original article or filing so the user can verify material information rather than trusting the label alone.</p></article>
+      </div>
+      <div class="guardrail wide-guardrail"><strong>There is intentionally no “prediction” layer in this architecture.</strong><span>Direction and impact help organize research. They do not claim that a security will rise, fall, outperform or generate a particular return.</span></div>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro narrow">
+        <p class="eyebrow">Threat model</p>
+        <h2>What the design helps reduce—and what it cannot solve.</h2>
+      </div>
+      <div class="audience-grid">
+        <article class="audience-card"><p class="eyebrow">Designed to reduce</p><h2>Unnecessary central knowledge.</h2><ul><li>Readable portfolio collection merely to research a ticker.</li><li>Readable watchlists sitting in the sync relay.</li><li>Ad-tech dependence on a detailed financial profile.</li><li>Unexplained interpretation detached from evidence.</li><li>Silent last-writer-wins assumptions during trusted-device sync.</li></ul></article>
+        <article class="audience-card trader-card"><p class="eyebrow">Not solved by architecture alone</p><h2>Endpoint and source risk still exist.</h2><ul><li>A compromised device or browser can expose information while it is readable.</li><li>Malicious extensions, malware, keylogging or screen capture remain endpoint risks.</li><li>Public data can be delayed, incomplete or wrong.</li><li>Interpretive labels can be wrong and must not replace source review.</li><li>Independent security review remains important before broad production-hardening claims.</li></ul></article>
+      </div>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro narrow">
+        <p class="eyebrow">Why this architecture matters commercially</p>
+        <h2>Monetize research value, not a user's portfolio profile.</h2>
+        <p>The same boundaries that support privacy can become product differentiation. A paid research product can charge for faster synthesis, deeper history, alerts, timelines and workflow—not for harvesting detailed holdings to build an advertising profile.</p>
+      </div>
+      <div class="future-note"><strong>Architectural direction, not a claim of current availability:</strong> the normalized evidence and catalyst layer can later support paid research history, “since I last checked,” scheduled briefings, team research views, developer APIs or enterprise integrations while keeping the same evidence/provenance model. Each future capability should preserve the minimum-data boundary appropriate to its use case.</div>
+    </section>
+
+    <section class="final-cta architecture-cta shell">
+      <div><p class="eyebrow">See the architecture in use</p><h2>Start with one ticker.</h2><p>Open Ticker Watch, select a public company, inspect the catalysts and SEC filings, and trace an interpretation back to its source.</p></div>
+      <a class="primary-link" href="/trade/">Open Ticker Watch</a>
+    </section>
+  </main>
+
+  <footer class="footer"><div class="shell footer-inner"><p>Ticker Watch is an educational research tool. The architecture is designed for evidence organization and privacy-conscious research, not guaranteed outcomes or personalized trade instructions.</p><nav class="arch-footer-links" aria-label="Footer navigation"><a href="/trade/">Ticker Watch</a><a href="/trade/how-it-works/">How it works</a><a href="/trade/architecture/">Architecture</a><a href="/methodology/">Methodology</a><a href="/security/">Security</a><a href="/privacy/">Privacy</a></nav></div></footer>
+</body>
+</html>
