@@ -5,8 +5,7 @@ workers_dev = false
 
 [vars]
 APP_ORIGIN = "https://finance.sharecapsule.org"
-PUBLIC_ORIGIN = "https://billing.finance.sharecapsule.org"
-COOKIE_DOMAIN = "finance.sharecapsule.org"
+PUBLIC_ORIGIN = "https://billing.sharecapsule.org"
 
 [[d1_databases]]
 binding = "DB"
@@ -15,7 +14,7 @@ database_id = "308ccf7d-716d-40b1-97b2-bb309d407270"
 migrations_dir = "migrations"
 
 [[routes]]
-pattern = "billing.finance.sharecapsule.org"
+pattern = "billing.sharecapsule.org"
 custom_domain = true
 
 [observability]
