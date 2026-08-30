@@ -1,0 +1,22 @@
+name = "sharecapsule-finance-billing"
+main = "src/index.js"
+compatibility_date = "2026-08-29"
+workers_dev = false
+
+[vars]
+APP_ORIGIN = "https://finance.sharecapsule.org"
+PUBLIC_ORIGIN = "https://billing.finance.sharecapsule.org"
+COOKIE_DOMAIN = "finance.sharecapsule.org"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sharecapsule-finance-billing"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[[routes]]
+pattern = "billing.finance.sharecapsule.org"
+custom_domain = true
+
+[observability]
+enabled = false
