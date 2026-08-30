@@ -76,7 +76,7 @@
       panel.setAttribute('aria-labelledby', 'watchlistBriefingTitle');
       panel.innerHTML = `
         <div class="watchlist-briefing-heading">
-          <div><p class="eyebrow">Plus intelligence</p><h2 id="watchlistBriefingTitle">Whole-watchlist briefing</h2><p>Rank the most important returned news and SEC developments across the tickers encrypted on this device, then listen to one concise research briefing.</p></div>
+          <div><p class="eyebrow">Plus intelligence</p><h2 id="watchlistBriefingTitle">Whole-watchlist briefing</h2><p>Rank the most important returned news developments across the tickers encrypted on this device, then listen to one concise research briefing.</p></div>
           <span id="watchlistBriefingAccess" class="watchlist-plus-badge">Checking Plus…</span>
         </div>
         <div class="watchlist-briefing-actions">
@@ -194,8 +194,9 @@
   }
 
   function formatPercent(value) {
+    if (value === null || value === undefined || value === '') return 'price change not requested';
     const number = Number(value);
-    return Number.isFinite(number) ? `${number >= 0 ? '+' : ''}${number.toFixed(2)}%` : 'change unavailable';
+    return Number.isFinite(number) ? `${number >= 0 ? '+' : ''}${number.toFixed(2)}%` : 'price change not requested';
   }
 
   function buildSpeechSegments(data) {
@@ -208,17 +209,16 @@
     (data.highlights || []).forEach((item, index) => {
       const tickers = Array.isArray(item.tickers) && item.tickers.length ? item.tickers.join(', ') : item.ticker;
       const direction = item.direction === 'positive' ? 'potentially positive' : item.direction === 'negative' ? 'potentially negative' : 'neutral or mixed';
-      const kind = item.kind === 'filing' ? 'SEC filing' : 'news item';
       result.push({
         title: item.title,
-        text: `Highlight ${index + 1}, for ${tickers}. This ${kind} is ranked ${item.impact || 'low'} impact and ${direction}. ${clean(item.title)}. ${clean(item.summary)} ${clean(item.why)}`
+        text: `Highlight ${index + 1}, for ${tickers}. This news item is ranked ${item.impact || 'low'} impact and ${direction}. ${clean(item.title)}. ${clean(item.summary)} ${clean(item.why)}`
       });
     });
 
     if ((data.remainingTickers || []).length) {
       result.push({
         title: 'Other watchlist names',
-        text: `The remaining watchlist tickers did not place an event in the top ${data.highlights?.length || 0} highlights: ${data.remainingTickers.join(', ')}. This does not mean nothing changed; it means other returned events ranked higher in this briefing.`
+        text: `The remaining watchlist tickers did not place a story in the top ${data.highlights?.length || 0} highlights: ${data.remainingTickers.join(', ')}. This means no returned story for those names ranked above the selected highlights in the current recent-news scan.`
       });
     }
     result.push({
@@ -239,16 +239,16 @@
     const snapshots = Array.isArray(data.snapshots) ? data.snapshots : [];
     $('watchlistBriefingSnapshots').innerHTML = snapshots.length
       ? snapshots.map((item) => `<div class="watchlist-brief-snapshot"><strong>${esc(item.ticker)}</strong><span>${esc(item.company)}</span><span>${esc(formatPercent(item.changePercent))} · ${esc(item.tone)}</span></div>`).join('')
-      : '<div class="briefing-empty">No ticker snapshots were returned.</div>';
+      : '<div class="briefing-empty">No ticker coverage cards were returned.</div>';
 
     const highlights = Array.isArray(data.highlights) ? data.highlights : [];
     $('watchlistBriefingTranscript').innerHTML = highlights.length
       ? highlights.map((item, index) => {
           const tickers = Array.isArray(item.tickers) && item.tickers.length ? item.tickers.join(', ') : item.ticker;
           const url = safeUrl(item.url);
-          return `<article class="watchlist-brief-item"><div class="watchlist-brief-meta"><span>${index + 1}</span><span>${esc(tickers)}</span><span>${esc(item.impact || 'low')} impact</span><span>${esc(item.kind === 'filing' ? 'SEC filing' : item.direction || 'neutral')}</span></div><h3>${esc(item.title)}</h3>${item.summary ? `<p>${esc(item.summary)}</p>` : ''}${item.why ? `<div class="watchlist-brief-why">Why ranked: ${esc(item.why)}</div>` : ''}${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open original source ↗</a>` : ''}</article>`;
+          return `<article class="watchlist-brief-item"><div class="watchlist-brief-meta"><span>${index + 1}</span><span>${esc(tickers)}</span><span>${esc(item.impact || 'low')} impact</span><span>${esc(item.direction || 'neutral')}</span></div><h3>${esc(item.title)}</h3>${item.summary ? `<p>${esc(item.summary)}</p>` : ''}${item.why ? `<div class="watchlist-brief-why">Why ranked: ${esc(item.why)}</div>` : ''}${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open original source ↗</a>` : ''}</article>`;
         }).join('')
-      : '<div class="briefing-empty">No recent events were ranked for this watchlist.</div>';
+      : '<div class="briefing-empty">No recent stories were ranked for this watchlist.</div>';
 
     const failures = Array.isArray(data.failures) ? data.failures : [];
     $('watchlistBriefingFailures').hidden = failures.length === 0;
@@ -279,25 +279,21 @@
         setSpeechActive(-1);
         $('watchlistBriefingPause').disabled = true;
         $('watchlistBriefingStop').disabled = true;
-        setStatus('Watchlist briefing complete. Source links remain available below.');
+        setStatus('Briefing complete. Open any source below to review it directly.');
       }
       return;
     }
-    const segment = speechSegments[index];
-    const utterance = new SpeechSynthesisUtterance(segment.text);
+    const utterance = new SpeechSynthesisUtterance(speechSegments[index].text);
     const voice = preferredVoice();
     if (voice) utterance.voice = voice;
     utterance.lang = voice?.lang || 'en-US';
-    utterance.rate = Number($('watchlistBriefingRate').value || 1);
-    utterance.onstart = () => {
-      setSpeechActive(index);
-      setStatus(index === 0 ? 'Playing watchlist overview.' : `Playing ${segment.title}.`);
-    };
+    utterance.rate = Number($('watchlistBriefingRate')?.value || 1);
+    utterance.onstart = () => { setSpeechActive(index); setStatus(speechSegments[index].title); };
     utterance.onend = () => { if (speaking) speak(index + 1); };
     utterance.onerror = (event) => {
       if (event.error === 'canceled' || event.error === 'interrupted') return;
       speaking = false;
-      setStatus(`Audio stopped: ${event.error || 'speech synthesis error'}. The transcript remains available.`, true);
+      setStatus(`Audio could not continue: ${event.error || 'speech synthesis error'}. The written briefing remains available.`, true);
     };
     synth.speak(utterance);
   }
@@ -326,14 +322,13 @@
   }
 
   function stop() {
-    if (!synth) return;
     speaking = false;
-    synth.cancel();
+    synth?.cancel();
     setSpeechActive(-1);
     $('watchlistBriefingPause').disabled = true;
     $('watchlistBriefingStop').disabled = true;
     $('watchlistBriefingPause').textContent = 'Pause';
-    if (briefing) setStatus('Watchlist briefing stopped. The generated briefing remains below.');
+    setStatus('Watchlist briefing stopped. The written briefing remains available.');
   }
 
   async function generate() {
@@ -349,29 +344,25 @@
       if (!tickers.length) throw new Error('Add at least one ticker first.');
       setStatus(`Verifying Plus access for a ${tickers.length}-ticker briefing…`);
       const token = await capability();
-      setStatus(`Loading public market context for ${tickers.length} ticker${tickers.length === 1 ? '' : 's'}…`);
+      setStatus(`Scanning recent public news for ${tickers.length} ticker${tickers.length === 1 ? '' : 's'}…`);
       briefing = await requestBriefing(tickers, token);
       renderBriefing(briefing);
-      const partial = briefing.failures?.length ? ` ${briefing.failures.length} ticker${briefing.failures.length === 1 ? '' : 's'} could not be loaded.` : '';
-      setStatus(`Briefing ready with ${briefing.highlights?.length || 0} ranked highlights across ${briefing.loadedTickerCount || 0} ticker${briefing.loadedTickerCount === 1 ? '' : 's'}.${partial}`);
+      setStatus(`Briefing ready: ${briefing.loadedTickerCount || 0} ticker${briefing.loadedTickerCount === 1 ? '' : 's'} covered, ${(briefing.highlights || []).length} ranked highlight${(briefing.highlights || []).length === 1 ? '' : 's'}.`);
     } catch (error) {
       setStatus(`Could not generate watchlist briefing: ${error.message}`, true);
     } finally {
-      await renderAccess();
+      button.disabled = false;
     }
   }
 
-  function init() {
+  async function init() {
     if (!ensureUi()) return;
     $('watchlistBriefingGenerate').addEventListener('click', generate);
     $('watchlistBriefingPlay').addEventListener('click', play);
     $('watchlistBriefingPause').addEventListener('click', pauseResume);
     $('watchlistBriefingStop').addEventListener('click', stop);
-    const watchlist = $('watchlist');
-    if (watchlist) new MutationObserver(() => renderAccess()).observe(watchlist, {childList: true, subtree: true});
-    window.addEventListener('focus', fetchAccess);
-    window.addEventListener('beforeunload', () => { if (speaking) synth?.cancel(); });
-    fetchAccess();
+    window.addEventListener('beforeunload', () => synth?.cancel());
+    await fetchAccess();
   }
 
   init();
