@@ -26,6 +26,7 @@ Whole-watchlist briefings are intentionally **fresh-news only**:
 - no fallback to older news, including weekends or quiet-news periods
 - a ticker with no qualifying story is shown as `No news in the last 24 hours`
 - ranking favors the newest qualifying items inside the 24-hour window
+- the API response includes `freshnessWindowHours: 24` and `windowStart` so clients can display the active cutoff explicitly
 
 Massive's News endpoint supports `published_utc` comparison filters. The market Worker uses `published_utc.gte=<24-hour-cutoff>` and then validates timestamps locally as a second guard.
 
