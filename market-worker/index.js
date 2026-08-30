@@ -2,7 +2,7 @@ const MARKET_BASE = 'https://api.massive.com';
 const SEC_BASE = 'https://data.sec.gov';
 const CACHE_SECONDS = 120;
 const MAX_BATCH_TICKERS = 30;
-const BATCH_NEWS_PER_TICKER = 20;
+const BATCH_NEWS_LIMIT = 1000;
 const ALLOWED_ORIGINS = new Set(['https://finance.sharecapsule.org']);
 const HIGH_WORDS = ['earnings','guidance','acquisition','acquire','merger','fda','lawsuit','investigation','bankruptcy','offering','buyback','repurchase','dividend','ceo','cfo','cyber','breach','recall','restatement','default','contract'];
 const MEDIUM_WORDS = ['upgrade','downgrade','price target','analyst','partnership','launch','approval','forecast','restructuring','layoff','settlement'];
@@ -101,47 +101,38 @@ async function secFilings(cik,userAgent) {
   }
   return filings;
 }
-function normalizedQuote(snapshot,previousDay) {
+function normalizedQuote(snapshot) {
   if(snapshot?.ticker){const t=snapshot.ticker,day=t.day||{};return{price:t.lastTrade?.p??day.c??null,change:t.todaysChange??null,changePercent:t.todaysChangePerc??null,open:day.o??null,high:day.h??null,low:day.l??null,close:day.c??null,volume:day.v??null,asOf:t.updated?new Date(Number(t.updated)/1e6).toISOString():null,mode:'snapshot'};}
-  const bar=previousDay?.results?.[0]||{};return{price:bar.c??null,change:null,changePercent:null,open:bar.o??null,high:bar.h??null,low:bar.l??null,close:bar.c??null,volume:bar.v??null,asOf:bar.t?new Date(Number(bar.t)).toISOString():null,mode:'previous-close'};
+  return {price:null,change:null,changePercent:null,open:null,high:null,low:null,close:null,volume:null,asOf:null,mode:'unavailable'};
 }
 async function buildPayload(symbol,env) {
-  const [snapshot,previousDay,newsResponse,details]=await Promise.all([
+  const [snapshot,newsResponse,details]=await Promise.all([
     market(`/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(symbol)}`,env.POLYGON_API_KEY,false),
-    market(`/v2/aggs/ticker/${encodeURIComponent(symbol)}/prev?adjusted=true`,env.POLYGON_API_KEY,false),
     market(`/v2/reference/news?ticker=${encodeURIComponent(symbol)}&limit=20&sort=published_utc&order=desc`,env.POLYGON_API_KEY,true),
     market(`/v3/reference/tickers/${encodeURIComponent(symbol)}`,env.POLYGON_API_KEY,true)
   ]);
   const company=details?.results||{}; const news=normalizeNews(symbol,newsResponse?.results); const filings=await secFilings(company.cik,env.SEC_USER_AGENT);
-  return {ticker:symbol,company:{name:company.name||symbol,exchange:company.primary_exchange||null,cik:company.cik||null},quote:normalizedQuote(snapshot,previousDay),newsSummary:summarizeNews(news),news,filings,generatedAt:new Date().toISOString(),privacy:'Public market data response. No user finance data is accepted or stored by this application endpoint.'};
+  return {ticker:symbol,company:{name:company.name||symbol,exchange:company.primary_exchange||null,cik:company.cik||null},quote:normalizedQuote(snapshot),newsSummary:summarizeNews(news),news,filings,generatedAt:new Date().toISOString(),privacy:'Public market data response. No user finance data is accepted or stored by this application endpoint.'};
 }
 async function buildBatchPayload(symbols,env) {
-  const joined=symbols.join(',');
-  const newsLimit=Math.min(1000,Math.max(100,symbols.length*BATCH_NEWS_PER_TICKER));
-  const [snapshotResponse,filteredNewsResponse]=await Promise.all([
-    market(`/v2/snapshot/locale/us/markets/stocks/tickers?tickers=${encodeURIComponent(joined)}`,env.POLYGON_API_KEY,false),
-    market(`/v2/reference/news?ticker.any_of=${encodeURIComponent(joined)}&limit=${newsLimit}&sort=published_utc&order=desc`,env.POLYGON_API_KEY,false)
-  ]);
-  const newsResponse=filteredNewsResponse||await market(`/v2/reference/news?limit=1000&sort=published_utc&order=desc`,env.POLYGON_API_KEY,true);
-  const snapshotMap=new Map((Array.isArray(snapshotResponse?.tickers)?snapshotResponse.tickers:[]).map((item)=>[String(item?.ticker||'').toUpperCase(),item]));
+  const newsResponse=await market(`/v2/reference/news?limit=${BATCH_NEWS_LIMIT}&sort=published_utc&order=desc`,env.POLYGON_API_KEY,true);
   const articles=Array.isArray(newsResponse?.results)?newsResponse.results:[];
   const generatedAt=new Date().toISOString();
   const items=symbols.map((symbol)=>{
     const relevant=articles.filter((article)=>articleMatchesTicker(article,symbol));
     const news=normalizeNews(symbol,relevant);
-    const snapshot=snapshotMap.get(symbol)||null;
     return {
       ticker:symbol,
       company:{name:symbol,exchange:null,cik:null},
-      quote:normalizedQuote(snapshot?{ticker:snapshot}:null,null),
+      quote:normalizedQuote(null),
       newsSummary:summarizeNews(news),
       news,
       filings:[],
       generatedAt,
-      privacy:'Batch public-market response for explicitly requested ticker symbols. No user identity, finance vault, holdings, balances or transactions are accepted or stored.'
+      privacy:'Batch public-news response for explicitly requested ticker symbols. No user identity, finance vault, holdings, balances or transactions are accepted or stored.'
     };
   });
-  return {items,generatedAt,filingsIncluded:false,providerRequests:filteredNewsResponse?2:3,privacy:'This server-only batch endpoint processes only public ticker symbols and returns public market/news data. It does not persist the requested watchlist.'};
+  return {items,generatedAt,filingsIncluded:false,providerRequests:1,coverage:`Latest ${BATCH_NEWS_LIMIT} market-news records scanned and matched by ticker association.`,privacy:'This server-only batch endpoint processes only public ticker symbols and returns public news data. It does not persist the requested watchlist.'};
 }
 async function handleBatch(request,env,origin) {
   if(origin) return json({error:'Batch endpoint is server-to-server only.'},403,origin,{'Cache-Control':'no-store'});
