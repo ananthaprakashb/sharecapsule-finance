@@ -1,8 +1,8 @@
 const FEATURE = 'daily_watchlist_briefing';
 const MAX_TICKERS = 30;
 const MAX_HIGHLIGHTS = 8;
-const FETCH_CONCURRENCY = 4;
-const FETCH_TIMEOUT_MS = 12000;
+const FETCH_TIMEOUT_MS = 15000;
+const BRIEFING_NEWS_WINDOW_HOURS = 24;
 const IMPACT_WEIGHT = Object.freeze({high: 3, medium: 2, low: 1});
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -55,13 +55,7 @@ async function verifyCapability(token, env) {
   if (payload.exp < now || payload.exp > now + 300) return {ok: false, reason: 'expired'};
 
   try {
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(env.BRIEFING_CAPABILITY_SECRET),
-      {name: 'HMAC', hash: 'SHA-256'},
-      false,
-      ['verify']
-    );
+    const key = await crypto.subtle.importKey('raw', encoder.encode(env.BRIEFING_CAPABILITY_SECRET), {name: 'HMAC', hash: 'SHA-256'}, false, ['verify']);
     const valid = await crypto.subtle.verify('HMAC', key, base64UrlDecode(parts[1]), encoder.encode(parts[0]));
     return valid ? {ok: true, payload} : {ok: false, reason: 'invalid'};
   } catch {
@@ -83,13 +77,20 @@ function normalizeTickers(value) {
   return unique;
 }
 
+function withinBriefingWindow(value) {
+  const time = Date.parse(String(value || ''));
+  if (!Number.isFinite(time)) return false;
+  const now = Date.now();
+  return time >= now - BRIEFING_NEWS_WINDOW_HOURS * 60 * 60 * 1000 && time <= now + 5 * 60 * 1000;
+}
+
 function freshnessScore(value) {
   const time = new Date(value || 0).getTime();
   if (!Number.isFinite(time) || time <= 0) return 0;
   const hours = Math.max(0, (Date.now() - time) / 3600000);
-  if (hours <= 12) return 3;
-  if (hours <= 36) return 2;
-  if (hours <= 96) return 1;
+  if (hours <= 6) return 3;
+  if (hours <= 12) return 2;
+  if (hours <= 24) return 1;
   return 0;
 }
 
@@ -103,23 +104,22 @@ function eventScore(event) {
 function eventsFromTicker(data) {
   const ticker = data.ticker;
   const company = data.company?.name || ticker;
-  const news = (Array.isArray(data.news) ? data.news : []).slice(0, 8).map((item) => ({
-    kind: 'news',
-    ticker,
-    company,
-    title: String(item.title || 'Untitled article'),
-    summary: String(item.summary || ''),
-    direction: ['positive', 'negative'].includes(item.direction) ? item.direction : 'neutral',
-    impact: ['high', 'medium'].includes(item.impact) ? item.impact : 'low',
-    why: String(item.impactReason || item.sentimentReason || ''),
-    source: String(item.publisher || 'News source'),
-    publishedAt: item.publishedAt || null,
-    url: String(item.url || '')
-  }));
+  const news = (Array.isArray(data.news) ? data.news : [])
+    .filter((item) => withinBriefingWindow(item.publishedAt))
+    .slice(0, 8)
+    .map((item) => ({
+      kind: 'news', ticker, company,
+      title: String(item.title || 'Untitled article'),
+      summary: String(item.summary || ''),
+      direction: ['positive', 'negative'].includes(item.direction) ? item.direction : 'neutral',
+      impact: ['high', 'medium'].includes(item.impact) ? item.impact : 'low',
+      why: String(item.impactReason || item.sentimentReason || ''),
+      source: String(item.publisher || 'News source'),
+      publishedAt: item.publishedAt || null,
+      url: String(item.url || '')
+    }));
   const filings = (Array.isArray(data.filings) ? data.filings : []).slice(0, 4).map((item) => ({
-    kind: 'filing',
-    ticker,
-    company,
+    kind: 'filing', ticker, company,
     title: `${item.form || 'SEC filing'} — ${item.description || 'Regulatory filing'}`,
     summary: 'Primary-source SEC filing. Review the filing itself for material details.',
     direction: 'neutral',
@@ -153,10 +153,7 @@ function dedupeAndRank(events) {
 }
 
 function watchlistContext(results) {
-  let positive = 0;
-  let negative = 0;
-  let neutral = 0;
-  let highImpact = 0;
+  let positive = 0, negative = 0, neutral = 0, highImpact = 0;
   for (const item of results) {
     const summary = item.data?.newsSummary || {};
     positive += Number(summary.positive || 0);
@@ -176,37 +173,35 @@ function watchlistContext(results) {
   return {positive, negative, neutral, highImpact, tone};
 }
 
-async function loadTicker(ticker, env) {
+async function loadWatchlist(tickers, env) {
+  if (!env.MARKET_BATCH_SECRET) throw new Error('Batch market access is not configured.');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const response = await fetch(`${env.MARKET_API}?symbol=${encodeURIComponent(ticker)}`, {
-      method: 'GET',
-      headers: {Accept: 'application/json'},
+    const response = await fetch(env.MARKET_API, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.MARKET_BATCH_SECRET}`
+      },
+      body: JSON.stringify({symbols: tickers}),
       signal: controller.signal
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error || `market gateway returned ${response.status}`);
-    return {ticker, ok: true, data: body};
+    const items = Array.isArray(body.items) ? body.items : [];
+    const byTicker = new Map(items.map((item) => [String(item?.ticker || '').toUpperCase(), item]));
+    return tickers.map((ticker) => {
+      const data = byTicker.get(ticker);
+      return data ? {ticker, ok: true, data} : {ticker, ok: false, error: 'No batch market payload was returned for this ticker.'};
+    });
   } catch (error) {
-    return {ticker, ok: false, error: error.name === 'AbortError' ? 'market request timed out' : String(error.message || error)};
+    const message = error.name === 'AbortError' ? 'batch market request timed out' : String(error.message || error);
+    return tickers.map((ticker) => ({ticker, ok: false, error: message}));
   } finally {
     clearTimeout(timeout);
   }
-}
-
-async function mapLimit(items, limit, task) {
-  const output = new Array(items.length);
-  let cursor = 0;
-  async function worker() {
-    while (true) {
-      const index = cursor++;
-      if (index >= items.length) return;
-      output[index] = await task(items[index], index);
-    }
-  }
-  await Promise.all(Array.from({length: Math.min(limit, items.length)}, worker));
-  return output;
 }
 
 function snapshots(results) {
@@ -217,7 +212,7 @@ function snapshots(results) {
       company: data.company?.name || item.ticker,
       price: Number.isFinite(Number(data.quote?.price)) ? Number(data.quote.price) : null,
       changePercent: Number.isFinite(Number(data.quote?.changePercent)) ? Number(data.quote.changePercent) : null,
-      tone: data.newsSummary?.label || 'No recent news',
+      tone: data.newsSummary?.label || `No news in the last ${BRIEFING_NEWS_WINDOW_HOURS} hours`,
       toneScore: Number(data.newsSummary?.score || 0),
       highImpactStories: Number(data.newsSummary?.highImpact || 0)
     };
@@ -234,7 +229,7 @@ async function generate(request, env, origin) {
   const tickers = normalizeTickers(input.tickers);
   if (!tickers.length) return json({error: 'Provide at least one valid ticker.'}, 400, origin, env);
 
-  const results = await mapLimit(tickers, FETCH_CONCURRENCY, (ticker) => loadTicker(ticker, env));
+  const results = await loadWatchlist(tickers, env);
   const successes = results.filter((item) => item.ok);
   if (!successes.length) return json({error: 'Market data could not be loaded for the requested watchlist.', failures: results.map(({ticker, error}) => ({ticker, error}))}, 502, origin, env);
 
@@ -242,10 +237,13 @@ async function generate(request, env, origin) {
   const highlights = dedupeAndRank(allEvents);
   const highlightedTickers = new Set(highlights.flatMap((event) => event.tickers || [event.ticker]));
   const context = watchlistContext(successes);
+  const windowStart = new Date(Date.now() - BRIEFING_NEWS_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
 
   return json({
     feature: FEATURE,
     generatedAt: new Date().toISOString(),
+    freshnessWindowHours: BRIEFING_NEWS_WINDOW_HOURS,
+    windowStart,
     requestedTickerCount: tickers.length,
     loadedTickerCount: successes.length,
     context,
@@ -253,8 +251,8 @@ async function generate(request, env, origin) {
     highlights: highlights.map(({score, ...event}) => event),
     remainingTickers: tickers.filter((ticker) => !highlightedTickers.has(ticker)),
     failures: results.filter((item) => !item.ok).map(({ticker, error}) => ({ticker, error})),
-    privacy: 'Only the ticker symbols explicitly included in this request were processed. No finance vault, balances, holdings, transactions, cost basis, brokerage credentials, or ShareCapsule user identity were sent to the briefing service.',
-    guardrail: 'This briefing summarizes public market information and recent coverage for research. It does not predict price direction or recommend a trade.'
+    privacy: 'Only the ticker symbols explicitly included in this request were processed. No finance vault, balances, holdings, transactions, cost basis, brokerage credentials, or ShareCapsule user identity were sent to the briefing service. The downstream market batch endpoint is server-only and does not persist the requested symbols.',
+    guardrail: `This briefing includes only public news published in the rolling last ${BRIEFING_NEWS_WINDOW_HOURS} hours. It is for research, does not predict price direction, and does not recommend a trade.`
   }, 200, origin, env);
 }
 
@@ -262,10 +260,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') || '';
-
-    if (url.pathname === '/health' && request.method === 'GET') {
-      return json({ok: true, service: 'sharecapsule-finance-briefing'}, 200, origin, env);
-    }
+    if (url.pathname === '/health' && request.method === 'GET') return json({ok: true, service: 'sharecapsule-finance-briefing'}, 200, origin, env);
     if (request.method === 'OPTIONS') {
       if (origin !== env.APP_ORIGIN) return new Response(null, {status: 403});
       return new Response(null, {status: 204, headers: cors(origin, env)});

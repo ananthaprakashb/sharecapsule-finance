@@ -1,6 +1,9 @@
 const MARKET_BASE = 'https://api.massive.com';
 const SEC_BASE = 'https://data.sec.gov';
 const CACHE_SECONDS = 120;
+const MAX_BATCH_TICKERS = 30;
+const BATCH_NEWS_LIMIT = 1000;
+const BATCH_NEWS_WINDOW_HOURS = 24;
 const ALLOWED_ORIGINS = new Set(['https://finance.sharecapsule.org']);
 const HIGH_WORDS = ['earnings','guidance','acquisition','acquire','merger','fda','lawsuit','investigation','bankruptcy','offering','buyback','repurchase','dividend','ceo','cfo','cyber','breach','recall','restatement','default','contract'];
 const MEDIUM_WORDS = ['upgrade','downgrade','price target','analyst','partnership','launch','approval','forecast','restructuring','layoff','settlement'];
@@ -21,6 +24,27 @@ async function market(path,apiKey,required=true) {
   if (!response.ok) { if (required) throw new Error(`Market provider returned ${response.status}`); return null; }
   return response.json();
 }
+function constantTimeEqual(a,b) {
+  const left=String(a||''); const right=String(b||'');
+  if(!left||left.length!==right.length) return false;
+  let diff=0;
+  for(let i=0;i<left.length;i++) diff|=left.charCodeAt(i)^right.charCodeAt(i);
+  return diff===0;
+}
+function bearerToken(request) {
+  const auth=request.headers.get('Authorization')||'';
+  return auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+}
+function normalizeSymbols(value) {
+  const input=Array.isArray(value)?value:[]; const seen=new Set(); const output=[];
+  for(const item of input) {
+    const symbol=String(item||'').trim().toUpperCase();
+    if(!/^[A-Z][A-Z0-9.-]{0,9}$/.test(symbol)||seen.has(symbol)) continue;
+    seen.add(symbol); output.push(symbol);
+    if(output.length>=MAX_BATCH_TICKERS) break;
+  }
+  return output;
+}
 function impactFromText(title,description) {
   const text = `${title||''} ${description||''}`.toLowerCase();
   const high = HIGH_WORDS.find((word)=>text.includes(word));
@@ -34,6 +58,15 @@ function normalizeDirection(sentiment) {
   if (value === 'positive' || value === 'bullish') return 'positive';
   if (value === 'negative' || value === 'bearish') return 'negative';
   return 'neutral';
+}
+function articleMatchesTicker(article,ticker) {
+  const direct=Array.isArray(article?.tickers)&&article.tickers.some((value)=>String(value||'').toUpperCase()===ticker);
+  const insight=Array.isArray(article?.insights)&&article.insights.some((value)=>String(value?.ticker||'').toUpperCase()===ticker);
+  return direct||insight;
+}
+function publishedWithinWindow(article,cutoffMs,nowMs) {
+  const published=Date.parse(String(article?.published_utc||''));
+  return Number.isFinite(published)&&published>=cutoffMs&&published<=nowMs+5*60*1000;
 }
 function normalizeNews(ticker,results) {
   return (Array.isArray(results)?results:[]).slice(0,20).map((article)=>{
@@ -73,28 +106,77 @@ async function secFilings(cik,userAgent) {
   }
   return filings;
 }
-function normalizedQuote(snapshot,previousDay) {
+function normalizedQuote(snapshot) {
   if(snapshot?.ticker){const t=snapshot.ticker,day=t.day||{};return{price:t.lastTrade?.p??day.c??null,change:t.todaysChange??null,changePercent:t.todaysChangePerc??null,open:day.o??null,high:day.h??null,low:day.l??null,close:day.c??null,volume:day.v??null,asOf:t.updated?new Date(Number(t.updated)/1e6).toISOString():null,mode:'snapshot'};}
-  const bar=previousDay?.results?.[0]||{};return{price:bar.c??null,change:null,changePercent:null,open:bar.o??null,high:bar.h??null,low:bar.l??null,close:bar.c??null,volume:bar.v??null,asOf:bar.t?new Date(Number(bar.t)).toISOString():null,mode:'previous-close'};
+  return {price:null,change:null,changePercent:null,open:null,high:null,low:null,close:null,volume:null,asOf:null,mode:'unavailable'};
 }
 async function buildPayload(symbol,env) {
-  const [snapshot,previousDay,newsResponse,details]=await Promise.all([
+  const [snapshot,newsResponse,details]=await Promise.all([
     market(`/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(symbol)}`,env.POLYGON_API_KEY,false),
-    market(`/v2/aggs/ticker/${encodeURIComponent(symbol)}/prev?adjusted=true`,env.POLYGON_API_KEY,false),
     market(`/v2/reference/news?ticker=${encodeURIComponent(symbol)}&limit=20&sort=published_utc&order=desc`,env.POLYGON_API_KEY,true),
     market(`/v3/reference/tickers/${encodeURIComponent(symbol)}`,env.POLYGON_API_KEY,true)
   ]);
   const company=details?.results||{}; const news=normalizeNews(symbol,newsResponse?.results); const filings=await secFilings(company.cik,env.SEC_USER_AGENT);
-  return {ticker:symbol,company:{name:company.name||symbol,exchange:company.primary_exchange||null,cik:company.cik||null},quote:normalizedQuote(snapshot,previousDay),newsSummary:summarizeNews(news),news,filings,generatedAt:new Date().toISOString(),privacy:'Public market data response. No user finance data is accepted or stored by this application endpoint.'};
+  return {ticker:symbol,company:{name:company.name||symbol,exchange:company.primary_exchange||null,cik:company.cik||null},quote:normalizedQuote(snapshot),newsSummary:summarizeNews(news),news,filings,generatedAt:new Date().toISOString(),privacy:'Public market data response. No user finance data is accepted or stored by this application endpoint.'};
+}
+async function buildBatchPayload(symbols,env) {
+  const nowMs=Date.now();
+  const cutoffMs=nowMs-BATCH_NEWS_WINDOW_HOURS*60*60*1000;
+  const cutoffIso=new Date(cutoffMs).toISOString();
+  const newsResponse=await market(`/v2/reference/news?published_utc.gte=${encodeURIComponent(cutoffIso)}&limit=${BATCH_NEWS_LIMIT}&sort=published_utc&order=desc`,env.POLYGON_API_KEY,true);
+  const articles=(Array.isArray(newsResponse?.results)?newsResponse.results:[]).filter((article)=>publishedWithinWindow(article,cutoffMs,nowMs));
+  const generatedAt=new Date(nowMs).toISOString();
+  const items=symbols.map((symbol)=>{
+    const relevant=articles.filter((article)=>articleMatchesTicker(article,symbol));
+    const news=normalizeNews(symbol,relevant);
+    const newsSummary=summarizeNews(news);
+    if(!news.length) {
+      newsSummary.label=`No news in the last ${BATCH_NEWS_WINDOW_HOURS} hours`;
+      newsSummary.basis=`No ticker-linked news published inside the rolling ${BATCH_NEWS_WINDOW_HOURS}-hour briefing window was returned.`;
+    } else {
+      newsSummary.basis=`Only ticker-linked news published inside the rolling ${BATCH_NEWS_WINDOW_HOURS}-hour briefing window is included. ${newsSummary.basis}`;
+    }
+    return {
+      ticker:symbol,
+      company:{name:symbol,exchange:null,cik:null},
+      quote:normalizedQuote(null),
+      newsSummary,
+      news,
+      filings:[],
+      generatedAt,
+      freshnessWindowHours:BATCH_NEWS_WINDOW_HOURS,
+      windowStart:cutoffIso,
+      privacy:'Batch public-news response for explicitly requested ticker symbols. No user identity, finance vault, holdings, balances or transactions are accepted or stored.'
+    };
+  });
+  return {items,generatedAt,freshnessWindowHours:BATCH_NEWS_WINDOW_HOURS,windowStart:cutoffIso,filingsIncluded:false,providerRequests:1,coverage:`Only market-news records published in the rolling last ${BATCH_NEWS_WINDOW_HOURS} hours are scanned and matched by ticker association.`,privacy:'This server-only batch endpoint processes only public ticker symbols and returns public news data. It does not persist the requested watchlist.'};
+}
+async function handleBatch(request,env,origin) {
+  if(origin) return json({error:'Batch endpoint is server-to-server only.'},403,origin,{'Cache-Control':'no-store'});
+  if(!env.MARKET_BATCH_SECRET) return json({error:'Batch market access is not configured.'},503,origin,{'Cache-Control':'no-store'});
+  if(!constantTimeEqual(bearerToken(request),env.MARKET_BATCH_SECRET)) return json({error:'Unauthorized.'},401,origin,{'Cache-Control':'no-store'});
+  const input=await request.json().catch(()=>({}));
+  const symbols=normalizeSymbols(input.symbols);
+  if(!symbols.length) return json({error:'Provide at least one valid ticker symbol.'},400,origin,{'Cache-Control':'no-store'});
+  try {
+    return json(await buildBatchPayload(symbols,env),200,origin,{'Cache-Control':'no-store'});
+  } catch(error) {
+    return json({error:error?.message||'Unable to load batch public market data'},502,origin,{'Cache-Control':'no-store'});
+  }
 }
 export default {
   async fetch(request,env,ctx) {
     const origin=request.headers.get('Origin')||'';
+    const url=new URL(request.url);
     if(request.method==='OPTIONS'){if(origin&&!ALLOWED_ORIGINS.has(origin))return json({error:'Origin not allowed'},403,origin,{'Cache-Control':'no-store'});return new Response(null,{status:204,headers:cors(origin)});}
-    if(request.method!=='GET') return json({error:'Method not allowed'},405,origin,{'Cache-Control':'no-store'});
     if(origin&&!ALLOWED_ORIGINS.has(origin)) return json({error:'Origin not allowed'},403,origin,{'Cache-Control':'no-store'});
     if(!env.POLYGON_API_KEY) return json({error:'Market provider is not configured'},503,origin,{'Cache-Control':'no-store'});
-    const url=new URL(request.url); if(url.pathname!=='/v1/ticker') return json({error:'Not found'},404,origin,{'Cache-Control':'no-store'});
+    if(url.pathname==='/v1/watchlist') {
+      if(request.method!=='POST') return json({error:'Method not allowed'},405,origin,{'Cache-Control':'no-store'});
+      return handleBatch(request,env,origin);
+    }
+    if(url.pathname!=='/v1/ticker') return json({error:'Not found'},404,origin,{'Cache-Control':'no-store'});
+    if(request.method!=='GET') return json({error:'Method not allowed'},405,origin,{'Cache-Control':'no-store'});
     const symbol=String(url.searchParams.get('symbol')||'').trim().toUpperCase(); if(!/^[A-Z][A-Z0-9.-]{0,9}$/.test(symbol)) return json({error:'Invalid ticker symbol'},400,origin,{'Cache-Control':'no-store'});
     const cache=caches.default; const cacheKey=new Request(`https://public-market-cache.sharecapsule.invalid/v1/ticker/${encodeURIComponent(symbol)}`); const cached=await cache.match(cacheKey);
     if(cached){const response=new Response(cached.body,cached);Object.entries(cors(origin)).forEach(([key,value])=>value&&response.headers.set(key,value));response.headers.set('X-ShareCapsule-Cache','HIT');return response;}
