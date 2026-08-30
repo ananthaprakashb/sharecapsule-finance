@@ -1,0 +1,1 @@
+.brand{display:inline-flex;align-items:center;gap:10px}.brand-mark{width:42px;height:42px;flex:0 0 42px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 1px rgba(255,215,80,.24),0 8px 26px rgba(0,0,0,.28)}.brand span{white-space:nowrap}@media(max-width:520px){.brand-mark{width:36px;height:36px;flex-basis:36px}.brand span{font-size:13px}}
