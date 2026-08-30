@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07101d">
+  <meta name="description" content="Manage your ShareCapsule Finance account, subscription and premium feature access without exposing financial vault data.">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https://lh3.googleusercontent.com data:; connect-src https://billing.finance.sharecapsule.org; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+  <title>Account — ShareCapsule Finance</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar"><div class="shell topbar-inner"><a class="brand" href="/">ShareCapsule Finance</a><nav><a href="/trade/">Ticker Watch</a><a href="/">Finance home</a></nav></div></header>
+  <main class="shell main">
+    <section class="hero"><p class="eyebrow">Account & subscription</p><h1>Pay for convenience.<br>Keep your finance data private.</h1><p class="lead">Your account stores identity and subscription status only. Your encrypted finance vault, transactions, balances, holdings and readable watchlist contents are not stored in the billing service.</p></section>
+
+    <div id="banner" class="banner" hidden></div>
+
+    <section class="panel account-panel">
+      <div><p class="eyebrow">Identity</p><h2 id="accountTitle">Checking account…</h2><p id="accountDetail" class="muted">Loading subscription state.</p></div>
+      <div class="account-actions"><button id="signInButton" class="primary" type="button" hidden>Continue with Google</button><button id="manageButton" class="secondary" type="button" hidden>Manage subscription</button><button id="signOutButton" class="secondary" type="button" hidden>Sign out</button></div>
+    </section>
+
+    <section class="plans">
+      <article class="panel plan"><p class="eyebrow">Free</p><h2>$0</h2><p class="muted">Private financial control and enough market research to evaluate ShareCapsule before paying.</p><ul><li>Encrypted finance vault</li><li>Basic Ticker Watch</li><li>Single-ticker audio briefing</li><li>Encrypted watchlist sync</li></ul><span id="freeState" class="plan-state">Available</span></article>
+      <article class="panel plan featured"><p class="eyebrow">Plus</p><h2>$6.99 <small>/ month</small></h2><p class="muted">Automation and intelligence that save time without giving the billing system access to your finance vault.</p><ul><li>Whole-watchlist daily briefing</li><li>Scheduled morning/evening briefings</li><li>Briefing history</li><li>Advanced market alerts</li></ul><div class="price-actions"><button id="monthlyButton" class="primary" type="button">Start monthly</button><button id="annualButton" class="secondary" type="button">$69 / year</button></div><span id="plusState" class="plan-state">Requires subscription</span></article>
+    </section>
+
+    <section class="panel features"><div><p class="eyebrow">Entitlements</p><h2>Your feature access</h2><p class="muted">These flags come from the billing Worker. Premium APIs will use the same server-side entitlement checks rather than trusting hidden buttons in the browser.</p></div><div id="featureList" class="feature-list"></div></section>
+
+    <section class="privacy-note"><strong>Privacy boundary</strong><span>Google is used only for account identity. Stripe handles payment details. ShareCapsule Billing stores account/subscription metadata and opaque session records; it does not receive decrypted finance-vault contents.</span></section>
+  </main>
+  <script src="./app.js" defer></script>
+</body>
+</html>
