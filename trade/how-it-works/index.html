@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07101d">
+  <meta name="description" content="See how ShareCapsule Ticker Watch turns public market news and SEC filings into privacy-first, source-linked research without requiring your portfolio or holdings.">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://finance.sharecapsule.org/trade/how-it-works/">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'none'; connect-src 'none'; script-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>How Ticker Watch Works — ShareCapsule Finance</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="/">ShareCapsule Finance</a>
+      <nav class="top-actions" aria-label="Ticker Watch navigation">
+        <a class="nav-link current" href="/trade/how-it-works/">How it works</a>
+        <a class="nav-link" href="/security/">Security</a>
+        <a class="nav-cta" href="/trade/">Open Ticker Watch</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="public-hero shell">
+      <div class="hero-copy">
+        <p class="eyebrow">Privacy-first market research</p>
+        <h1>Know what changed<br>before deciding what to do.</h1>
+        <p class="lead">Ticker Watch helps traders and investors reduce the time between market noise and useful research. Follow the companies you care about, surface recent catalysts and SEC filings, understand why an event may matter, and listen to a concise briefing — without uploading your portfolio or holdings.</p>
+        <div class="hero-actions">
+          <a class="primary-link" href="/trade/">Try Ticker Watch</a>
+          <a class="secondary-link" href="#technical-design">See the technical design</a>
+        </div>
+        <div class="trust-strip" aria-label="Product principles">
+          <span>Portfolio not required</span>
+          <span>Source-linked research</span>
+          <span>Encrypted watchlist</span>
+          <span>No price prediction claim</span>
+        </div>
+      </div>
+      <aside class="positioning-card">
+        <p class="eyebrow">The core idea</p>
+        <blockquote>Don't tell me what to buy. Tell me what changed and why I should care.</blockquote>
+        <p>Ticker Watch is designed as decision support, not an automated trading recommendation engine.</p>
+      </aside>
+    </section>
+
+    <section class="section-band shell" id="technical-design">
+      <div class="section-intro">
+        <p class="eyebrow">Technical design</p>
+        <h2>Research without handing over your portfolio.</h2>
+        <p>The architecture minimizes what the market research service needs to know. When you refresh a company, the requested ticker can be sent to the public-market gateway. Your full financial vault, position sizes and holdings are not required for Ticker Watch research.</p>
+      </div>
+
+      <div class="architecture" aria-label="Ticker Watch architecture">
+        <div class="architecture-column device-column">
+          <span class="architecture-label">Your device</span>
+          <div class="architecture-card strong-card">
+            <small>Encrypted watchlist</small>
+            <strong>AAPL · NVDA · MSFT</strong>
+            <p>Preferred tickers remain part of the local, privacy-first experience.</p>
+          </div>
+          <div class="architecture-note">Only the ticker you ask to refresh is needed for the market research request.</div>
+        </div>
+
+        <div class="architecture-arrow" aria-hidden="true"><span>selected ticker</span><b>→</b></div>
+
+        <div class="architecture-column service-column">
+          <span class="architecture-label">Research services</span>
+          <div class="architecture-card">
+            <small>Public-market gateway</small>
+            <strong>Market evidence</strong>
+            <p>Retrieves public market information needed for the selected ticker.</p>
+          </div>
+          <div class="source-pair">
+            <div><small>Evidence</small><strong>News</strong></div>
+            <div><small>Primary source</small><strong>SEC filings</strong></div>
+          </div>
+        </div>
+
+        <div class="architecture-arrow" aria-hidden="true"><span>evidence</span><b>→</b></div>
+
+        <div class="architecture-column browser-column">
+          <span class="architecture-label">Back in your browser</span>
+          <div class="architecture-card accent-card">
+            <small>Research view</small>
+            <strong>Catalysts + context</strong>
+            <p>News direction, event significance, filings and source links are organized for review.</p>
+          </div>
+          <div class="architecture-card">
+            <small>Personalized briefing</small>
+            <strong>Listen to what matters</strong>
+            <p>The briefing is assembled from the research already displayed on the page.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="privacy-callout">
+        <strong>Your holdings are not the product input.</strong>
+        <p>Ticker Watch does not need to know that you own a particular number of shares or the dollar value of a position in order to show research for a company.</p>
+      </div>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro narrow">
+        <p class="eyebrow">From noise to evidence</p>
+        <h2>Separate the fact, the interpretation and the source.</h2>
+        <p>A useful research tool should help you understand why something is being shown — not hide the reasoning behind an unexplained score.</p>
+      </div>
+      <div class="research-pipeline">
+        <article class="step-card">
+          <span class="step-number">01</span>
+          <p class="eyebrow">Fact</p>
+          <h3>What happened?</h3>
+          <p>Review ticker-linked coverage and recent public filings for the company you selected.</p>
+        </article>
+        <article class="step-card">
+          <span class="step-number">02</span>
+          <p class="eyebrow">Interpretation</p>
+          <h3>Why may it matter?</h3>
+          <p>Direction describes the tone of the news for the company. Impact describes the significance of the event.</p>
+        </article>
+        <article class="step-card">
+          <span class="step-number">03</span>
+          <p class="eyebrow">Evidence</p>
+          <h3>Where can I verify it?</h3>
+          <p>Open the source article or filing and inspect material information before making a financial decision.</p>
+        </article>
+      </div>
+      <div class="guardrail wide-guardrail">
+        <strong>Direction is not a stock-price forecast.</strong>
+        <span>A possibly positive company development does not mean the share price will rise. A high-impact label means an event may deserve attention, not that a trade should be placed.</span>
+      </div>
+    </section>
+
+    <section class="section-band shell">
+      <div class="audience-grid">
+        <article class="audience-card">
+          <p class="eyebrow">For investors</p>
+          <h2>Keep the company thesis current.</h2>
+          <p>Use Ticker Watch to notice material changes around companies you follow without turning every headline into a trading signal.</p>
+          <ul>
+            <li>Review earnings and company developments.</li>
+            <li>Find recent SEC filings beside news coverage.</li>
+            <li>Track potentially meaningful business or regulatory catalysts.</li>
+            <li>Open original sources when a development deserves deeper research.</li>
+          </ul>
+        </article>
+        <article class="audience-card trader-card">
+          <p class="eyebrow">For active traders</p>
+          <h2>Catch up faster before the next decision.</h2>
+          <p>Use the same evidence through a faster lens: identify the stories that may matter, review significance, then decide what deserves your attention.</p>
+          <ul>
+            <li>Prioritize high-impact stories.</li>
+            <li>Filter possible positive, negative and mixed coverage.</li>
+            <li>Scan filing activity beside market news.</li>
+            <li>Listen to a briefing when reading everything is impractical.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro narrow">
+        <p class="eyebrow">Research compression</p>
+        <h2>Spend less time opening everything.</h2>
+        <p>Ticker Watch is designed to compress the first stage of research. It helps identify what may deserve deeper reading; it does not replace the original source.</p>
+      </div>
+      <div class="compression-demo">
+        <div class="noise-stack" aria-label="Many incoming market items">
+          <span>Headline</span><span>Filing</span><span>Headline</span><span>Update</span><span>Headline</span><span>Filing</span><span>Headline</span><span>Update</span><span>Headline</span><span>Headline</span><span>Filing</span><span>Headline</span>
+        </div>
+        <div class="compression-arrow" aria-hidden="true">→</div>
+        <div class="signal-stack">
+          <div><strong>2</strong><span>high-impact developments</span></div>
+          <div><strong>3</strong><span>directional stories</span></div>
+          <div><strong>1</strong><span>filing to inspect</span></div>
+        </div>
+        <div class="compression-arrow" aria-hidden="true">→</div>
+        <div class="briefing-demo">
+          <span class="play-dot">▶</span>
+          <div><small>Personalized briefing</small><strong>Listen, then read deeper.</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro">
+        <p class="eyebrow">Privacy by design</p>
+        <h2>Minimize collection first. Encrypt what still needs to move.</h2>
+      </div>
+      <div class="principle-grid">
+        <article class="principle-card">
+          <span class="icon-chip">1</span>
+          <h3>Local-first watchlist</h3>
+          <p>Your preferred tickers are handled through the browser experience rather than requiring a readable portfolio to sit behind the research service.</p>
+        </article>
+        <article class="principle-card">
+          <span class="icon-chip">2</span>
+          <h3>Encrypted device sync</h3>
+          <p>When optional watchlist sync is enabled, the relay stores AES-GCM ciphertext. The sync service is not intended to receive readable ticker symbols from that encrypted payload.</p>
+        </article>
+        <article class="principle-card">
+          <span class="icon-chip">3</span>
+          <h3>One-time pairing</h3>
+          <p>Trusted-device pairing uses a short-lived capability so a sync key can be transferred to another device without turning the relay into the keeper of your readable watchlist.</p>
+        </article>
+        <article class="principle-card">
+          <span class="icon-chip">4</span>
+          <h3>No ad-tech dependency</h3>
+          <p>The product is designed around user-paid research value rather than monetizing a detailed portfolio profile for advertising.</p>
+        </article>
+      </div>
+      <p class="security-link">For the broader finance vault threat model, cryptographic controls and limitations, read the <a href="/security/">published security model</a>.</p>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro narrow">
+        <p class="eyebrow">What we intentionally do not promise</p>
+        <h2>Research support without pretending uncertainty disappeared.</h2>
+      </div>
+      <div class="boundary-list">
+        <div><span>×</span><p><strong>No guaranteed winning trades.</strong> Markets can react differently from the apparent tone of a development.</p></div>
+        <div><span>×</span><p><strong>No automatic BUY / SELL instruction.</strong> The current product organizes evidence and context rather than issuing personalized trade recommendations.</p></div>
+        <div><span>×</span><p><strong>No requirement to upload brokerage holdings.</strong> Company research can remain useful without collecting position sizes and portfolio value.</p></div>
+        <div><span>×</span><p><strong>No replacement for primary-source review.</strong> Material information should be verified at the original source before a financial decision.</p></div>
+      </div>
+    </section>
+
+    <section class="final-cta shell">
+      <div>
+        <p class="eyebrow">Start with one ticker</p>
+        <h2>See what changed. Follow the evidence.</h2>
+        <p>Add a U.S. ticker, review the recent catalysts and filings, and generate a briefing from the research already on screen.</p>
+      </div>
+      <a class="primary-link large-link" href="/trade/">Open Ticker Watch</a>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell footer-inner">
+      <p>Ticker Watch is an educational research tool. News direction, impact labels and audio briefings are research aids, not predictions or recommendations. Verify material information at the original source before making a financial decision.</p>
+      <nav aria-label="Footer navigation"><a href="/trade/">Ticker Watch</a><a href="/methodology/">Methodology</a><a href="/security/">Security</a><a href="/privacy/">Privacy</a><a href="/">Finance home</a></nav>
+    </div>
+  </footer>
+</body>
+</html>
