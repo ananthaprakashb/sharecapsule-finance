@@ -23,7 +23,7 @@ Whole-watchlist briefings are intentionally **fresh-news only**:
 
 - rolling window: last 24 hours from generation time
 - stories older than 24 hours are excluded entirely
-- no fallback to older news
+- no fallback to older news, including weekends or quiet-news periods
 - a ticker with no qualifying story is shown as `No news in the last 24 hours`
 - ranking favors the newest qualifying items inside the 24-hour window
 
