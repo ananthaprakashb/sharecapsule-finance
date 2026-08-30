@@ -11,7 +11,7 @@ COOKIE_DOMAIN = "finance.sharecapsule.org"
 [[d1_databases]]
 binding = "DB"
 database_name = "sharecapsule-finance-billing"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "308ccf7d-716d-40b1-97b2-bb309d407270"
 migrations_dir = "migrations"
 
 [[routes]]
