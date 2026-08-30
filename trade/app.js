@@ -170,6 +170,16 @@
     $('toneBasis').textContent = summary.basis || 'News tone is a research aid, not a price forecast.';
   }
 
+  function renderFreeSnapshot(data, summary, filings) {
+    const ticker = data.ticker || selected || 'This ticker';
+    const directional = Number(summary.positive || 0) + Number(summary.negative || 0);
+    $('freeStoryCount').textContent = String(currentNews.length);
+    $('freeHighCount').textContent = String(summary.highImpact || 0);
+    $('freeDirectionalCount').textContent = String(directional);
+    $('freeFilingCount').textContent = String(filings.length);
+    $('freeSnapshotText').textContent = `${ticker} is using the full free single-ticker workflow: ${currentNews.length} recent stor${currentNews.length === 1 ? 'y' : 'ies'}, ${summary.highImpact || 0} high-impact item${Number(summary.highImpact || 0) === 1 ? '' : 's'} and ${filings.length} SEC filing${filings.length === 1 ? '' : 's'} returned. Review the sources and generate the single-ticker audio briefing without upgrading.`;
+  }
+
   function updateFilters() {
     document.querySelectorAll('[data-filter]').forEach((button) => button.classList.toggle('active', button.dataset.filter === currentFilter));
   }
@@ -200,9 +210,12 @@
     $('dayVolume').textContent = Number.isFinite(Number(data.quote?.volume)) ? compact.format(Number(data.quote.volume)) : '—';
     $('marketNote').textContent = data.quote?.asOf ? `Market data as of ${new Date(data.quote.asOf).toLocaleString()}. Availability and delay depend on the configured market-data plan.` : 'Market timestamp unavailable.';
     currentNews = Array.isArray(data.news) ? data.news : [];
-    renderSummary(data.newsSummary || deriveSummary(currentNews));
+    const summary = data.newsSummary || deriveSummary(currentNews);
+    const filings = Array.isArray(data.filings) ? data.filings : [];
+    renderSummary(summary);
     renderNews();
-    renderFilings(Array.isArray(data.filings) ? data.filings : []);
+    renderFilings(filings);
+    renderFreeSnapshot(data, summary, filings);
   }
 
   async function loadTicker(ticker) {
