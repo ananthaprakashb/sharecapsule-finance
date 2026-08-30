@@ -2,6 +2,7 @@ const FEATURE = 'daily_watchlist_briefing';
 const MAX_TICKERS = 30;
 const MAX_HIGHLIGHTS = 8;
 const FETCH_TIMEOUT_MS = 15000;
+const BRIEFING_NEWS_WINDOW_HOURS = 24;
 const IMPACT_WEIGHT = Object.freeze({high: 3, medium: 2, low: 1});
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -76,13 +77,20 @@ function normalizeTickers(value) {
   return unique;
 }
 
+function withinBriefingWindow(value) {
+  const time = Date.parse(String(value || ''));
+  if (!Number.isFinite(time)) return false;
+  const now = Date.now();
+  return time >= now - BRIEFING_NEWS_WINDOW_HOURS * 60 * 60 * 1000 && time <= now + 5 * 60 * 1000;
+}
+
 function freshnessScore(value) {
   const time = new Date(value || 0).getTime();
   if (!Number.isFinite(time) || time <= 0) return 0;
   const hours = Math.max(0, (Date.now() - time) / 3600000);
-  if (hours <= 12) return 3;
-  if (hours <= 36) return 2;
-  if (hours <= 96) return 1;
+  if (hours <= 6) return 3;
+  if (hours <= 12) return 2;
+  if (hours <= 24) return 1;
   return 0;
 }
 
@@ -96,17 +104,20 @@ function eventScore(event) {
 function eventsFromTicker(data) {
   const ticker = data.ticker;
   const company = data.company?.name || ticker;
-  const news = (Array.isArray(data.news) ? data.news : []).slice(0, 8).map((item) => ({
-    kind: 'news', ticker, company,
-    title: String(item.title || 'Untitled article'),
-    summary: String(item.summary || ''),
-    direction: ['positive', 'negative'].includes(item.direction) ? item.direction : 'neutral',
-    impact: ['high', 'medium'].includes(item.impact) ? item.impact : 'low',
-    why: String(item.impactReason || item.sentimentReason || ''),
-    source: String(item.publisher || 'News source'),
-    publishedAt: item.publishedAt || null,
-    url: String(item.url || '')
-  }));
+  const news = (Array.isArray(data.news) ? data.news : [])
+    .filter((item) => withinBriefingWindow(item.publishedAt))
+    .slice(0, 8)
+    .map((item) => ({
+      kind: 'news', ticker, company,
+      title: String(item.title || 'Untitled article'),
+      summary: String(item.summary || ''),
+      direction: ['positive', 'negative'].includes(item.direction) ? item.direction : 'neutral',
+      impact: ['high', 'medium'].includes(item.impact) ? item.impact : 'low',
+      why: String(item.impactReason || item.sentimentReason || ''),
+      source: String(item.publisher || 'News source'),
+      publishedAt: item.publishedAt || null,
+      url: String(item.url || '')
+    }));
   const filings = (Array.isArray(data.filings) ? data.filings : []).slice(0, 4).map((item) => ({
     kind: 'filing', ticker, company,
     title: `${item.form || 'SEC filing'} — ${item.description || 'Regulatory filing'}`,
@@ -201,7 +212,7 @@ function snapshots(results) {
       company: data.company?.name || item.ticker,
       price: Number.isFinite(Number(data.quote?.price)) ? Number(data.quote.price) : null,
       changePercent: Number.isFinite(Number(data.quote?.changePercent)) ? Number(data.quote.changePercent) : null,
-      tone: data.newsSummary?.label || 'No recent news',
+      tone: data.newsSummary?.label || `No news in the last ${BRIEFING_NEWS_WINDOW_HOURS} hours`,
       toneScore: Number(data.newsSummary?.score || 0),
       highImpactStories: Number(data.newsSummary?.highImpact || 0)
     };
@@ -226,10 +237,13 @@ async function generate(request, env, origin) {
   const highlights = dedupeAndRank(allEvents);
   const highlightedTickers = new Set(highlights.flatMap((event) => event.tickers || [event.ticker]));
   const context = watchlistContext(successes);
+  const windowStart = new Date(Date.now() - BRIEFING_NEWS_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
 
   return json({
     feature: FEATURE,
     generatedAt: new Date().toISOString(),
+    freshnessWindowHours: BRIEFING_NEWS_WINDOW_HOURS,
+    windowStart,
     requestedTickerCount: tickers.length,
     loadedTickerCount: successes.length,
     context,
@@ -238,7 +252,7 @@ async function generate(request, env, origin) {
     remainingTickers: tickers.filter((ticker) => !highlightedTickers.has(ticker)),
     failures: results.filter((item) => !item.ok).map(({ticker, error}) => ({ticker, error})),
     privacy: 'Only the ticker symbols explicitly included in this request were processed. No finance vault, balances, holdings, transactions, cost basis, brokerage credentials, or ShareCapsule user identity were sent to the briefing service. The downstream market batch endpoint is server-only and does not persist the requested symbols.',
-    guardrail: 'This briefing summarizes public market information and recent coverage for research. It does not predict price direction or recommend a trade.'
+    guardrail: `This briefing includes only public news published in the rolling last ${BRIEFING_NEWS_WINDOW_HOURS} hours. It is for research, does not predict price direction, and does not recommend a trade.`
   }, 200, origin, env);
 }
 
