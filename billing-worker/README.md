@@ -61,7 +61,7 @@ Create a Google OAuth **Web application** client.
 Authorized redirect URI:
 
 ```text
-https://billing.finance.sharecapsule.org/v1/auth/google/callback
+https://billing.sharecapsule.org/v1/auth/google/callback
 ```
 
 The Worker requests only:
@@ -92,7 +92,7 @@ npx wrangler secret put STRIPE_PRICE_PLUS_ANNUAL --config .\wrangler.toml
 Configure a Stripe webhook endpoint:
 
 ```text
-https://billing.finance.sharecapsule.org/v1/stripe/webhook
+https://billing.sharecapsule.org/v1/stripe/webhook
 ```
 
 Subscribe it to at least:
@@ -121,7 +121,7 @@ npx wrangler deploy --config .\wrangler.toml
 The custom domain in Wrangler is:
 
 ```text
-billing.finance.sharecapsule.org
+billing.sharecapsule.org
 ```
 
 Do not manually create a conflicting CNAME for that hostname when using a Workers Custom Domain.
@@ -131,7 +131,7 @@ Do not manually create a conflicting CNAME for that hostname when using a Worker
 Health:
 
 ```powershell
-curl.exe "https://billing.finance.sharecapsule.org/health"
+curl.exe "https://billing.sharecapsule.org/health"
 ```
 
 Expected:
@@ -143,7 +143,7 @@ Expected:
 CORS / anonymous entitlement state:
 
 ```powershell
-curl.exe -i -H "Origin: https://finance.sharecapsule.org" "https://billing.finance.sharecapsule.org/v1/me"
+curl.exe -i -H "Origin: https://finance.sharecapsule.org" "https://billing.sharecapsule.org/v1/me"
 ```
 
 Expected body begins with:
@@ -180,6 +180,6 @@ The next premium API should check one of these entitlements in the Worker before
 
 ## Session design
 
-The browser receives a random 256-bit opaque session cookie scoped to `finance.sharecapsule.org`. D1 stores only its SHA-256 hash. Sessions expire after 30 days and can be revoked on sign-out.
+The browser receives a random 256-bit opaque **host-only** session cookie from `billing.sharecapsule.org`. D1 stores only its SHA-256 hash. Sessions expire after 30 days and can be revoked on sign-out. The account UI on `finance.sharecapsule.org` calls the billing Worker with credentialed requests; the session cookie is not widened to unrelated ShareCapsule subdomains.
 
 State-changing browser routes require the exact `https://finance.sharecapsule.org` `Origin`. The session cookie is `Secure`, `HttpOnly` and `SameSite=Lax`.
