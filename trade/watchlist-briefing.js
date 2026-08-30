@@ -19,7 +19,7 @@
   let speechIndex = -1;
 
   const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
-  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const unb64 = (text) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 
   function safeUrl(value) {
@@ -76,7 +76,7 @@
       panel.setAttribute('aria-labelledby', 'watchlistBriefingTitle');
       panel.innerHTML = `
         <div class="watchlist-briefing-heading">
-          <div><p class="eyebrow">Plus intelligence</p><h2 id="watchlistBriefingTitle">Whole-watchlist briefing</h2><p>Rank the most important returned news developments across the tickers encrypted on this device, then listen to one concise research briefing.</p></div>
+          <div><p class="eyebrow">Plus intelligence</p><h2 id="watchlistBriefingTitle">Whole-watchlist briefing</h2><p>Rank the most important news published in the last 24 hours across the tickers encrypted on this device, then listen to one concise research briefing.</p></div>
           <span id="watchlistBriefingAccess" class="watchlist-plus-badge">Checking Plus…</span>
         </div>
         <div class="watchlist-briefing-actions">
@@ -157,7 +157,7 @@
     badge.classList.add('active');
     button.textContent = 'Generate watchlist briefing';
     button.disabled = count === 0;
-    if (!briefing) setStatus(count ? `Ready to review ${count} ticker${count === 1 ? '' : 's'} without sending your finance vault.` : 'Add at least one ticker to generate a watchlist briefing.');
+    if (!briefing) setStatus(count ? `Ready to review the last 24 hours across ${count} ticker${count === 1 ? '' : 's'} without sending your finance vault.` : 'Add at least one ticker to generate a watchlist briefing.');
   }
 
   async function capability() {
@@ -203,7 +203,7 @@
     const context = data.context || {};
     const result = [{
       title: 'Watchlist overview',
-      text: `Here is your ShareCapsule Finance Plus watchlist briefing for ${data.loadedTickerCount || 0} ticker${data.loadedTickerCount === 1 ? '' : 's'}. Recent coverage has a ${clean(context.tone || 'mixed or neutral')} tone, with ${context.positive || 0} potentially positive stories, ${context.negative || 0} potentially negative stories, and ${context.highImpact || 0} high-impact stories. Here are the developments ranked highest for review.`
+      text: `Here is your ShareCapsule Finance Plus watchlist briefing for ${data.loadedTickerCount || 0} ticker${data.loadedTickerCount === 1 ? '' : 's'}. Coverage is limited to the last ${data.freshnessWindowHours || 24} hours. Recent coverage has a ${clean(context.tone || 'mixed or neutral')} tone, with ${context.positive || 0} potentially positive stories, ${context.negative || 0} potentially negative stories, and ${context.highImpact || 0} high-impact stories. Here are the developments ranked highest for review.`
     }];
 
     (data.highlights || []).forEach((item, index) => {
@@ -218,7 +218,7 @@
     if ((data.remainingTickers || []).length) {
       result.push({
         title: 'Other watchlist names',
-        text: `The remaining watchlist tickers did not place a story in the top ${data.highlights?.length || 0} highlights: ${data.remainingTickers.join(', ')}. This means no returned story for those names ranked above the selected highlights in the current recent-news scan.`
+        text: `The remaining watchlist tickers did not place a story in the top ${data.highlights?.length || 0} highlights: ${data.remainingTickers.join(', ')}. This can include tickers with no qualifying news in the last ${data.freshnessWindowHours || 24} hours.`
       });
     }
     result.push({
@@ -246,9 +246,9 @@
       ? highlights.map((item, index) => {
           const tickers = Array.isArray(item.tickers) && item.tickers.length ? item.tickers.join(', ') : item.ticker;
           const url = safeUrl(item.url);
-          return `<article class="watchlist-brief-item"><div class="watchlist-brief-meta"><span>${index + 1}</span><span>${esc(tickers)}</span><span>${esc(item.impact || 'low')} impact</span><span>${esc(item.direction || 'neutral')}</span></div><h3>${esc(item.title)}</h3>${item.summary ? `<p>${esc(item.summary)}</p>` : ''}${item.why ? `<div class="watchlist-brief-why">Why ranked: ${esc(item.why)}</div>` : ''}${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open original source ↗</a>` : ''}</article>`;
+          return `<article class="watchlist-brief-item"><div class="watchlist-brief-meta"><span>${index + 1}</span><span>${esc(tickers)}</span><span>${esc(item.impact || 'low')} impact</span><span>${esc(item.direction || 'neutral')}</span>${item.publishedAt ? `<span>${esc(new Date(item.publishedAt).toLocaleString())}</span>` : ''}</div><h3>${esc(item.title)}</h3>${item.summary ? `<p>${esc(item.summary)}</p>` : ''}${item.why ? `<div class="watchlist-brief-why">Why ranked: ${esc(item.why)}</div>` : ''}${url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Open original source ↗</a>` : ''}</article>`;
         }).join('')
-      : '<div class="briefing-empty">No recent stories were ranked for this watchlist.</div>';
+      : `<div class="briefing-empty">No news published in the last ${esc(data.freshnessWindowHours || 24)} hours was ranked for this watchlist.</div>`;
 
     const failures = Array.isArray(data.failures) ? data.failures : [];
     $('watchlistBriefingFailures').hidden = failures.length === 0;
@@ -344,15 +344,29 @@
       if (!tickers.length) throw new Error('Add at least one ticker first.');
       setStatus(`Verifying Plus access for a ${tickers.length}-ticker briefing…`);
       const token = await capability();
-      setStatus(`Scanning recent public news for ${tickers.length} ticker${tickers.length === 1 ? '' : 's'}…`);
+      setStatus(`Scanning public news from the last 24 hours for ${tickers.length} ticker${tickers.length === 1 ? '' : 's'}…`);
       briefing = await requestBriefing(tickers, token);
       renderBriefing(briefing);
-      setStatus(`Briefing ready: ${briefing.loadedTickerCount || 0} ticker${briefing.loadedTickerCount === 1 ? '' : 's'} covered, ${(briefing.highlights || []).length} ranked highlight${(briefing.highlights || []).length === 1 ? '' : 's'}.`);
+      setStatus(`Briefing ready: ${briefing.loadedTickerCount || 0} ticker${briefing.loadedTickerCount === 1 ? '' : 's'} covered, ${(briefing.highlights || []).length} ranked highlight${(briefing.highlights || []).length === 1 ? '' : 's'} from the last ${briefing.freshnessWindowHours || 24} hours.`);
+      window.dispatchEvent(new CustomEvent('sharecapsule:watchlist-briefing-generated', {detail: {briefing}}));
     } catch (error) {
       setStatus(`Could not generate watchlist briefing: ${error.message}`, true);
     } finally {
       button.disabled = false;
     }
+  }
+
+  function openHistory(event) {
+    if (!access.authenticated || !access.allowed) return;
+    const saved = event?.detail?.briefing;
+    if (!saved || typeof saved !== 'object') return;
+    stop();
+    briefing = saved;
+    renderBriefing(briefing);
+    const generated = Date.parse(String(briefing.generatedAt || ''));
+    const label = Number.isFinite(generated) ? new Date(generated).toLocaleString() : 'an earlier time';
+    setStatus(`Opened encrypted briefing history from ${label}. This is the saved snapshot; no market data was refreshed.`);
+    document.querySelector('.watchlist-briefing-panel')?.scrollIntoView({behavior: 'smooth', block: 'start'});
   }
 
   async function init() {
@@ -361,6 +375,7 @@
     $('watchlistBriefingPlay').addEventListener('click', play);
     $('watchlistBriefingPause').addEventListener('click', pauseResume);
     $('watchlistBriefingStop').addEventListener('click', stop);
+    window.addEventListener('sharecapsule:watchlist-briefing-open-history', openHistory);
     window.addEventListener('beforeunload', () => synth?.cancel());
     await fetchAccess();
   }
