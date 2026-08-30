@@ -9,7 +9,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
-DOMAIN = "finance.sharecapsule.app"
+DOMAIN = "finance.sharecapsule.org"
 BASE_URL = f"https://{DOMAIN}"
 
 REQUIRED = [

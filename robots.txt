@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://finance.sharecapsule.app/sitemap.xml
+Sitemap: https://finance.sharecapsule.org/sitemap.xml
