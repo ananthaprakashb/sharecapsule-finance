@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="g1" cx="0" cy="0" r="1" gradientTransform="translate(150 30) rotate(38) scale(520 360)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#74c0fc" stop-opacity=".20"/><stop offset="1" stop-color="#07101d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="g2" cx="0" cy="0" r="1" gradientTransform="translate(1050 80) rotate(140) scale(430 310)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#63e6be" stop-opacity=".15"/><stop offset="1" stop-color="#07101d" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#07101d"/>
+  <rect width="1200" height="630" fill="url(#g1)"/><rect width="1200" height="630" fill="url(#g2)"/>
+  <g transform="translate(70 58)">
+    <rect width="84" height="84" rx="22" fill="#101f33" stroke="#26384d" stroke-width="2"/>
+    <rect x="17" y="48" width="9" height="20" rx="4.5" fill="#74c0fc"/>
+    <rect x="35" y="38" width="9" height="30" rx="4.5" fill="#74c0fc"/>
+    <rect x="53" y="26" width="9" height="42" rx="4.5" fill="#63e6be"/>
+    <path d="M17 45 36 35 50 39 68 21" fill="none" stroke="#f7fbff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m68 21-10 2 7 8z" fill="#f7fbff"/>
+  </g>
+  <text x="176" y="110" fill="#f7fbff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="38" font-weight="800">ShareCapsule Finance</text>
+  <rect x="72" y="172" width="360" height="44" rx="22" fill="#0e2b2d" stroke="#285550"/>
+  <text x="95" y="201" fill="#63e6be" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="19" font-weight="800" letter-spacing="1.5">PRIVACY-FIRST MARKET RESEARCH</text>
+  <text x="72" y="318" fill="#f7fbff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="64" font-weight="850">Know what changed</text>
+  <text x="72" y="394" fill="#f7fbff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="64" font-weight="850">before deciding what to do.</text>
+  <text x="74" y="463" fill="#c8d4e0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="26">Source-linked catalysts, SEC filings and audio briefings</text>
+  <text x="74" y="500" fill="#c8d4e0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="26">without uploading your portfolio.</text>
+
+  <g transform="translate(835 145)">
+    <rect width="290" height="365" rx="28" fill="#101f33" stroke="#26384d" stroke-width="2"/>
+    <text x="30" y="55" fill="#63e6be" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="22" font-weight="800">TICKER WATCH</text>
+    <text x="30" y="102" fill="#9fb0c4" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17">Ticker</text>
+    <text x="230" y="102" fill="#f7fbff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="19" font-weight="800">NVDA</text>
+    <g font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" fill="#f7fbff">
+      <rect x="28" y="132" width="234" height="42" rx="12" fill="#14283e"/><circle cx="46" cy="153" r="6" fill="#74c0fc"/><text x="62" y="159">NEWS + FILINGS</text>
+      <rect x="28" y="187" width="234" height="42" rx="12" fill="#14283e"/><circle cx="46" cy="208" r="6" fill="#63e6be"/><text x="62" y="214">CATALYST CONTEXT</text>
+      <rect x="28" y="242" width="234" height="42" rx="12" fill="#14283e"/><circle cx="46" cy="263" r="6" fill="#f7fbff"/><text x="62" y="269">SOURCE LINKS</text>
+      <rect x="28" y="297" width="234" height="42" rx="12" fill="#14283e"/><circle cx="46" cy="318" r="6" fill="#63e6be"/><text x="62" y="324">AUDIO BRIEF</text>
+    </g>
+  </g>
+</svg>
