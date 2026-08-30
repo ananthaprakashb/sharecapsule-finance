@@ -34,6 +34,7 @@
   async function start() {
     try {
       await loadScript('./watchlist-briefing.js');
+      await loadScript('./briefing-history.js');
     } catch (error) {
       console.warn('Ticker Watch Plus briefing UI could not be started.', error);
     }
