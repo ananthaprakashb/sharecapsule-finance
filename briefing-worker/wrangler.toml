@@ -5,7 +5,7 @@ workers_dev = false
 
 [vars]
 APP_ORIGIN = "https://finance.sharecapsule.org"
-MARKET_API = "https://finance-market.sharecapsule.org/v1/ticker"
+MARKET_API = "https://finance-market.sharecapsule.org/v1/watchlist"
 
 [[routes]]
 pattern = "briefing.sharecapsule.org"
