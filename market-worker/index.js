@@ -3,6 +3,7 @@ const SEC_BASE = 'https://data.sec.gov';
 const CACHE_SECONDS = 120;
 const MAX_BATCH_TICKERS = 30;
 const BATCH_NEWS_LIMIT = 1000;
+const BATCH_NEWS_WINDOW_HOURS = 24;
 const ALLOWED_ORIGINS = new Set(['https://finance.sharecapsule.org']);
 const HIGH_WORDS = ['earnings','guidance','acquisition','acquire','merger','fda','lawsuit','investigation','bankruptcy','offering','buyback','repurchase','dividend','ceo','cfo','cyber','breach','recall','restatement','default','contract'];
 const MEDIUM_WORDS = ['upgrade','downgrade','price target','analyst','partnership','launch','approval','forecast','restructuring','layoff','settlement'];
@@ -63,6 +64,10 @@ function articleMatchesTicker(article,ticker) {
   const insight=Array.isArray(article?.insights)&&article.insights.some((value)=>String(value?.ticker||'').toUpperCase()===ticker);
   return direct||insight;
 }
+function publishedWithinWindow(article,cutoffMs,nowMs) {
+  const published=Date.parse(String(article?.published_utc||''));
+  return Number.isFinite(published)&&published>=cutoffMs&&published<=nowMs+5*60*1000;
+}
 function normalizeNews(ticker,results) {
   return (Array.isArray(results)?results:[]).slice(0,20).map((article)=>{
     const insight = Array.isArray(article.insights) ? article.insights.find((item)=>String(item.ticker||'').toUpperCase()===ticker) : null;
@@ -115,24 +120,36 @@ async function buildPayload(symbol,env) {
   return {ticker:symbol,company:{name:company.name||symbol,exchange:company.primary_exchange||null,cik:company.cik||null},quote:normalizedQuote(snapshot),newsSummary:summarizeNews(news),news,filings,generatedAt:new Date().toISOString(),privacy:'Public market data response. No user finance data is accepted or stored by this application endpoint.'};
 }
 async function buildBatchPayload(symbols,env) {
-  const newsResponse=await market(`/v2/reference/news?limit=${BATCH_NEWS_LIMIT}&sort=published_utc&order=desc`,env.POLYGON_API_KEY,true);
-  const articles=Array.isArray(newsResponse?.results)?newsResponse.results:[];
-  const generatedAt=new Date().toISOString();
+  const nowMs=Date.now();
+  const cutoffMs=nowMs-BATCH_NEWS_WINDOW_HOURS*60*60*1000;
+  const cutoffIso=new Date(cutoffMs).toISOString();
+  const newsResponse=await market(`/v2/reference/news?published_utc.gte=${encodeURIComponent(cutoffIso)}&limit=${BATCH_NEWS_LIMIT}&sort=published_utc&order=desc`,env.POLYGON_API_KEY,true);
+  const articles=(Array.isArray(newsResponse?.results)?newsResponse.results:[]).filter((article)=>publishedWithinWindow(article,cutoffMs,nowMs));
+  const generatedAt=new Date(nowMs).toISOString();
   const items=symbols.map((symbol)=>{
     const relevant=articles.filter((article)=>articleMatchesTicker(article,symbol));
     const news=normalizeNews(symbol,relevant);
+    const newsSummary=summarizeNews(news);
+    if(!news.length) {
+      newsSummary.label=`No news in the last ${BATCH_NEWS_WINDOW_HOURS} hours`;
+      newsSummary.basis=`No ticker-linked news published inside the rolling ${BATCH_NEWS_WINDOW_HOURS}-hour briefing window was returned.`;
+    } else {
+      newsSummary.basis=`Only ticker-linked news published inside the rolling ${BATCH_NEWS_WINDOW_HOURS}-hour briefing window is included. ${newsSummary.basis}`;
+    }
     return {
       ticker:symbol,
       company:{name:symbol,exchange:null,cik:null},
       quote:normalizedQuote(null),
-      newsSummary:summarizeNews(news),
+      newsSummary,
       news,
       filings:[],
       generatedAt,
+      freshnessWindowHours:BATCH_NEWS_WINDOW_HOURS,
+      windowStart:cutoffIso,
       privacy:'Batch public-news response for explicitly requested ticker symbols. No user identity, finance vault, holdings, balances or transactions are accepted or stored.'
     };
   });
-  return {items,generatedAt,filingsIncluded:false,providerRequests:1,coverage:`Latest ${BATCH_NEWS_LIMIT} market-news records scanned and matched by ticker association.`,privacy:'This server-only batch endpoint processes only public ticker symbols and returns public news data. It does not persist the requested watchlist.'};
+  return {items,generatedAt,freshnessWindowHours:BATCH_NEWS_WINDOW_HOURS,windowStart:cutoffIso,filingsIncluded:false,providerRequests:1,coverage:`Only market-news records published in the rolling last ${BATCH_NEWS_WINDOW_HOURS} hours are scanned and matched by ticker association.`,privacy:'This server-only batch endpoint processes only public ticker symbols and returns public news data. It does not persist the requested watchlist.'};
 }
 async function handleBatch(request,env,origin) {
   if(origin) return json({error:'Batch endpoint is server-to-server only.'},403,origin,{'Cache-Control':'no-store'});
