@@ -44,6 +44,11 @@
       <p id="status" class="status">Only the selected ticker symbol is sent to the public-market gateway when you request a refresh. Your financial vault is never sent.</p>
     </section>
 
+    <section class="free-core-strip" aria-label="Free Ticker Watch access">
+      <div><span class="free-tier-badge">Free core</span><strong>Research first. Upgrade only for automation.</strong><p>Single-ticker market data, catalysts, SEC filings, source links, audio briefing and encrypted watchlist sync remain available without a Plus subscription.</p></div>
+      <a href="/account/?return_to=/trade/">Compare Free & Plus</a>
+    </section>
+
     <section class="panel sync-panel" aria-labelledby="syncTitle">
       <div class="sync-heading">
         <div><p class="eyebrow">Trusted devices</p><h2 id="syncTitle">Encrypted watchlist sync</h2><p id="syncMessage" class="status">Enable encrypted sync to keep preferred tickers consistent across trusted devices.</p></div>
@@ -77,9 +82,22 @@
       <article class="panel quote-panel"><div class="quote-head"><div><p class="eyebrow" id="companyName">Selected company</p><h2 id="tickerName">—</h2></div><div class="quote-price"><strong id="lastPrice">—</strong><span id="dayChange">—</span></div></div><div class="quote-grid"><div><span>Day open</span><strong id="dayOpen">—</strong></div><div><span>Day high</span><strong id="dayHigh">—</strong></div><div><span>Day low</span><strong id="dayLow">—</strong></div><div><span>Volume</span><strong id="dayVolume">—</strong></div></div><p class="market-note" id="marketNote"></p></article>
       <article class="panel tone-panel"><div class="tone-heading"><div><p class="eyebrow">Recent ticker-linked coverage</p><h2 id="toneLabel">News tone</h2><p class="market-note" id="toneBasis">Waiting for recent news.</p></div><div class="tone-score"><span>Tone index</span><strong id="toneScore">0</strong><small>-100 negative · +100 positive</small></div></div><div class="tone-grid"><div class="tone-stat positive"><span>Possible positive</span><strong id="tonePositive">0</strong></div><div class="tone-stat negative"><span>Possible negative</span><strong id="toneNegative">0</strong></div><div class="tone-stat neutral"><span>Neutral / mixed</span><strong id="toneNeutral">0</strong></div><div class="tone-stat high"><span>High-impact stories</span><strong id="toneHigh">0</strong></div></div></article>
 
+      <article id="freeSnapshotPanel" class="panel free-snapshot-panel" aria-labelledby="freeSnapshotTitle">
+        <div class="free-snapshot-heading"><div><p class="eyebrow">Your research snapshot</p><h2 id="freeSnapshotTitle">Useful before you pay.</h2></div><span class="free-tier-badge">Included free</span></div>
+        <div class="free-snapshot-grid">
+          <div><span>Recent stories</span><strong id="freeStoryCount">0</strong></div>
+          <div><span>High-impact</span><strong id="freeHighCount">0</strong></div>
+          <div><span>Directional</span><strong id="freeDirectionalCount">0</strong></div>
+          <div><span>SEC filings</span><strong id="freeFilingCount">0</strong></div>
+        </div>
+        <p id="freeSnapshotText" class="free-snapshot-text" aria-live="polite">Load a ticker to see the research included in the free experience.</p>
+        <div class="free-included-list"><span>✓ Review every returned story</span><span>✓ Open original sources</span><span>✓ Inspect returned SEC filings</span><span>✓ Generate single-ticker audio</span></div>
+        <div class="free-upgrade-row"><div><p class="eyebrow">When you want automation</p><strong>Apply the workflow across your whole watchlist.</strong><span>Plus adds whole-watchlist briefings, scheduled briefings, briefing history and advanced alerts. The single-ticker research above stays free.</span></div><a href="/account/?return_to=/trade/">See Plus automation</a></div>
+      </article>
+
       <article class="panel briefing-panel" aria-labelledby="briefingTitle">
         <div class="briefing-heading">
-          <div><p class="eyebrow">Personalized podcast</p><h2 id="briefingTitle">Listen to the news briefing</h2><p class="briefing-kicker">Hear the important stories first, then open only the articles you want to understand in depth. High-impact and directional stories are prioritized in the spoken briefing.</p></div>
+          <div><p class="eyebrow">Personalized podcast</p><h2 id="briefingTitle">Listen to the news briefing</h2><p class="briefing-kicker">Hear the important stories first, then open only the articles you want to understand in depth. High-impact and directional stories are prioritized in the spoken briefing.</p><span class="free-included-inline">Included free for one ticker</span></div>
           <span id="briefingProgress" class="briefing-progress">0 / 0</span>
         </div>
         <div class="briefing-controls">
