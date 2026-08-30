@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const API = 'https://billing.finance.sharecapsule.org';
+  const API = 'https://billing.sharecapsule.org';
   const $ = (id) => document.getElementById(id);
   let state = null;
 
