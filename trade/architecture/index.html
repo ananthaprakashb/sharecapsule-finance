@@ -4,20 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07101d">
-  <meta name="description" content="Technical architecture of ShareCapsule Ticker Watch: local-first watchlists, encrypted sync, minimal ticker requests, source-linked market evidence, catalyst context, and browser-based briefings.">
+  <meta name="description" content="Technical architecture of ShareCapsule Ticker Watch: local-first watchlists, encrypted research memory, minimal ticker requests, source-linked evidence, and browser-based Research Radio.">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="index,follow">
   <link rel="canonical" href="https://finance.sharecapsule.org/trade/architecture/">
   <link rel="icon" type="image/png" href="/assets/golden-hand-growth-prosperity.png">
   <meta property="og:title" content="Ticker Watch Architecture — ShareCapsule Finance">
-  <meta property="og:description" content="See how Ticker Watch minimizes portfolio data collection while turning public market evidence into source-linked research.">
+  <meta property="og:description" content="See how Ticker Watch minimizes portfolio data collection while combining public evidence, encrypted research memory, and browser-based Research Radio.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://finance.sharecapsule.org/trade/architecture/">
   <meta property="og:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
   <meta property="og:image:alt" content="Golden hand holding coins below a rising green growth arrow, ShareCapsule Finance">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Ticker Watch Architecture — ShareCapsule Finance">
-  <meta name="twitter:description" content="Privacy-first market research architecture with minimal data collection, encrypted sync, evidence provenance, and browser briefings.">
+  <meta name="twitter:description" content="Privacy-first market research architecture with encrypted research memory, evidence provenance, and browser-based Research Radio.">
   <meta name="twitter:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; connect-src 'none'; script-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Ticker Watch Architecture — ShareCapsule Finance</title>
@@ -43,7 +43,7 @@
       <div>
         <p class="eyebrow">Technical architecture</p>
         <h1>Build useful market research.<br>Know less about the investor.</h1>
-        <p class="lead">Ticker Watch is designed around a simple boundary: the research service needs to know which public company you asked about, not the size and composition of your brokerage portfolio. The architecture combines local-first preferences, encrypted device sync, public-market evidence, source-linked interpretation, and browser-generated briefings.</p>
+        <p class="lead">Ticker Watch is designed around a simple boundary: the research service needs to know which public company you asked about, not the size and composition of your brokerage portfolio. The current architecture combines local-first preferences, encrypted research memory, optional encrypted device sync, public-market evidence, source-linked interpretation, and browser-generated Research Radio.</p>
         <div class="hero-actions">
           <a class="primary-link" href="/trade/">Open Ticker Watch</a>
           <a class="secondary-link" href="#request-lifecycle">Follow one request</a>
@@ -55,15 +55,17 @@
     <section class="section-band shell">
       <div class="section-intro narrow">
         <p class="eyebrow">System overview</p>
-        <h2>Five layers, with an explicit data boundary at each step.</h2>
+        <h2>Seven layers, with an explicit data boundary at each step.</h2>
         <p>The architecture is intentionally easier to explain than a black-box recommendation engine. Each layer has a narrow responsibility, and the user can move from interpretation back to evidence.</p>
       </div>
       <div class="flow-grid" aria-label="Ticker Watch system flow">
-        <article class="flow-step"><small>Layer 1</small><h3>User device</h3><p>Stores the local watchlist experience and the user's trusted-device state. The product does not require brokerage holdings to start research.</p><span class="boundary">private preference layer</span></article>
+        <article class="flow-step"><small>Layer 1</small><h3>User device</h3><p>Stores the local watchlist experience, device encryption key, trusted-device state and local research-memory checkpoints.</p><span class="boundary">private state layer</span></article>
         <article class="flow-step"><small>Layer 2</small><h3>Selected ticker request</h3><p>When the user refreshes a company, the public-market request can be scoped to the selected ticker rather than the user's full financial profile.</p><span class="boundary">minimal request payload</span></article>
         <article class="flow-step"><small>Layer 3</small><h3>Market gateway</h3><p>Coordinates the public information needed for the selected company and returns a normalized research payload to the browser.</p><span class="boundary">public-market services</span></article>
         <article class="flow-step"><small>Layer 4</small><h3>Evidence + context</h3><p>Recent news, SEC filings, direction context and event significance are organized while preserving links back to the underlying evidence.</p><span class="boundary">explainable research</span></article>
-        <article class="flow-step"><small>Layer 5</small><h3>Browser research view</h3><p>The user reviews catalysts and filings, filters what matters, and can generate an audio briefing from the research already displayed.</p><span class="boundary">decision-support interface</span></article>
+        <article class="flow-step"><small>Layer 5</small><h3>Encrypted research memory</h3><p>For Plus users, the browser compares current evidence with the prior encrypted per-ticker checkpoint and identifies only newly surfaced stories and filings.</p><span class="boundary">device-local continuity</span></article>
+        <article class="flow-step"><small>Layer 6</small><h3>Research Radio</h3><p>The browser turns already-rendered research into 3-, 5- or 10-minute target listening formats. Plus can also play a changes-only catch-up from research memory.</p><span class="boundary">browser presentation</span></article>
+        <article class="flow-step"><small>Layer 7</small><h3>Optional Plus automation</h3><p>Whole-watchlist briefing and scheduled workflows use entitlement-gated services without changing the free single-ticker research boundary.</p><span class="boundary">paid workflow layer</span></article>
       </div>
     </section>
 
@@ -79,7 +81,8 @@
         <div class="request-row"><div><strong>Public evidence is gathered.</strong><p>The gateway retrieves the market information needed for the ticker, including recent coverage and filing information supported by the current product.</p></div><em>market services</em></div>
         <div class="request-row"><div><strong>Evidence is normalized.</strong><p>The result is returned in a shape the client can consistently render and compare rather than exposing provider-specific structures throughout the UI.</p></div><em>gateway</em></div>
         <div class="request-row"><div><strong>Context is shown beside the source.</strong><p>Direction describes company-news tone; impact describes event significance. The user can open the original story or filing.</p></div><em>research layer</em></div>
-        <div class="request-row"><div><strong>The browser can build the briefing.</strong><p>The spoken briefing is assembled from the headlines, summaries and labels already displayed. No additional ShareCapsule content request is required merely to create the transcript.</p></div><em>browser</em></div>
+        <div class="request-row"><div><strong>Plus research memory computes the delta locally.</strong><p>If the user has access to “Since I last checked,” the browser decrypts the previous checkpoint, compares evidence keys, renders newly surfaced items, then encrypts the updated checkpoint again.</p></div><em>device-local AES-GCM</em></div>
+        <div class="request-row"><div><strong>Research Radio can build a listening format.</strong><p>The browser assembles a 3-, 5- or 10-minute target transcript from already-rendered evidence. Changes-only mode uses the local “Since I last checked” result. No extra ShareCapsule content request is required merely to create the single-ticker transcript.</p></div><em>browser</em></div>
       </div>
     </section>
 
@@ -94,9 +97,11 @@
           <tr><td><strong>Selected ticker</strong></td><td>Browser → market gateway on refresh</td><td><span class="yes">Yes</span></td><td>It identifies the public company for which research was requested.</td></tr>
           <tr><td><strong>Full watchlist</strong></td><td>User-device experience; optional encrypted sync</td><td><span class="no">No</span></td><td>A single-company research request does not need the user's entire preference set.</td></tr>
           <tr><td><strong>Portfolio holdings</strong></td><td>Not required by Ticker Watch</td><td><span class="no">No</span></td><td>Company evidence can be presented without collecting share counts or portfolio value.</td></tr>
-          <tr><td><strong>Vault passphrase / sync key</strong></td><td>Trusted device boundary</td><td><span class="no">No</span></td><td>The sync relay is not intended to receive the finance vault passphrase or readable watchlist encryption key.</td></tr>
+          <tr><td><strong>Vault passphrase / device encryption key</strong></td><td>Trusted device boundary</td><td><span class="no">No</span></td><td>Research services do not need the finance vault passphrase or readable watchlist/research-memory encryption key.</td></tr>
           <tr><td><strong>Public news / filings</strong></td><td>Market evidence pipeline and browser result</td><td><span class="yes">Yes</span></td><td>These are the evidence objects the research experience is built to help the user inspect.</td></tr>
-          <tr><td><strong>Briefing transcript</strong></td><td>Browser-generated from displayed research</td><td><span class="no">No additional request</span></td><td>The current briefing can be assembled from content already present in the page.</td></tr>
+          <tr><td><strong>“Since I last checked” checkpoint</strong></td><td>Encrypted device-local IndexedDB record</td><td><span class="no">No</span></td><td>The current implementation compares the prior evidence set in the browser and does not attach the checkpoint to market requests.</td></tr>
+          <tr><td><strong>Plus entitlement</strong></td><td>Billing service</td><td><span class="no">Separate service</span></td><td>Billing verifies feature access without needing the readable research-memory checkpoint or finance vault.</td></tr>
+          <tr><td><strong>Research Radio transcript</strong></td><td>Browser-generated from displayed research</td><td><span class="no">No additional request</span></td><td>Single-ticker listening formats can be assembled from content already present in the page.</td></tr>
         </tbody>
       </table>
     </section>
@@ -104,15 +109,33 @@
     <section class="section-band shell">
       <div class="section-intro narrow">
         <p class="eyebrow">Privacy architecture</p>
-        <h2>Minimize first. Encrypt the state that still needs to move.</h2>
+        <h2>Minimize first. Encrypt the state that still needs to persist or move.</h2>
       </div>
       <div class="layer-grid">
         <article class="layer-card"><p class="eyebrow">Local preference layer</p><h3>Encrypted watchlist</h3><p>Ticker preferences are part of the privacy-first browser experience. Optional cross-device synchronization is designed around ciphertext rather than a readable watchlist database.</p><ul><li>AES-GCM encrypted sync payload.</li><li>Relay is not intended to read ticker symbols inside the encrypted payload.</li><li>Readable state exists on the trusted device when needed by the UI.</li></ul></article>
+        <article class="layer-card"><p class="eyebrow">Local continuity layer</p><h3>Encrypted research memory</h3><p>“Since I last checked” stores a per-ticker checkpoint encrypted with the existing Ticker Watch device key.</p><ul><li>Prior evidence identifiers remain device-local.</li><li>First check creates an honest baseline rather than labeling everything new.</li><li>Subsequent checks compute only the newly surfaced delta.</li><li>Current version is intentionally not synced across devices.</li></ul></article>
         <article class="layer-card"><p class="eyebrow">Trusted-device layer</p><h3>One-time pairing</h3><p>Pairing is separated from the public market research request. A short-lived pairing capability is used to connect another trusted device without turning the relay into the keeper of the vault passphrase.</p><ul><li>Short-lived pairing capability.</li><li>Separate sync authorization.</li><li>Revision/conflict handling avoids silent overwrite assumptions.</li></ul></article>
         <article class="layer-card"><p class="eyebrow">Public research layer</p><h3>Minimal market requests</h3><p>Only the company the user asks to research needs to cross the public-market boundary for that request. This is a design choice, not merely a privacy-policy statement.</p><ul><li>No brokerage login required for Ticker Watch.</li><li>No position size required.</li><li>No full portfolio needed to retrieve company research.</li></ul></article>
-        <article class="layer-card"><p class="eyebrow">Presentation layer</p><h3>Browser-generated briefing</h3><p>The browser turns the already-displayed research into a spoken sequence, prioritizing the stories the UI has identified as significant or directional.</p><ul><li>Transcript assembled from displayed items.</li><li>Original sources remain visible.</li><li>Local system voice is preferred when the browser reports one.</li></ul></article>
+        <article class="layer-card"><p class="eyebrow">Audio presentation layer</p><h3>Research Radio in the browser</h3><p>The browser turns already-displayed evidence into a spoken sequence. It prioritizes high-impact and directional items and can include SEC filings in longer formats.</p><ul><li>3-, 5- and 10-minute target formats for single-ticker research.</li><li>Actual runtime depends on available sourced evidence and playback speed.</li><li>Changes-only Plus mode consumes the local research-memory result.</li><li>Local system voice is preferred when the browser reports one.</li></ul></article>
+        <article class="layer-card"><p class="eyebrow">Entitlement layer</p><h3>Free research, paid continuity</h3><p>The commercial boundary follows the architecture: free users retain useful single-ticker research and audio; Plus adds research memory and automation.</p><ul><li>Billing checks access independently of market evidence retrieval.</li><li>Free research is not hidden behind an entitlement request.</li><li>Plus monetizes continuity and saved time rather than access to basic evidence.</li></ul></article>
       </div>
       <p class="security-link">Cryptographic details and limitations are documented separately in the <a href="/security/">published security model</a>.</p>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro narrow">
+        <p class="eyebrow">Research Radio architecture</p>
+        <h2>Listening is another view of the evidence—not another black box.</h2>
+        <p>Research Radio does not invent a separate recommendation layer. It transforms the same visible research into a prioritized spoken sequence and keeps the source links in the transcript.</p>
+      </div>
+      <div class="request-list">
+        <div class="request-row"><div><strong>3-minute quick scan.</strong><p>Uses the highest-priority stories first and keeps context short. It is designed for fast orientation, not exhaustive coverage.</p></div><em>Free</em></div>
+        <div class="request-row"><div><strong>5-minute research brief.</strong><p>Adds more context and can include returned SEC filings while preserving source-linked transcript items.</p></div><em>Free</em></div>
+        <div class="request-row"><div><strong>10-minute deep dive.</strong><p>Uses a larger evidence budget and longer context where available. It remains shorter when the page does not contain enough sourced material.</p></div><em>Free</em></div>
+        <div class="request-row"><div><strong>Changes-only catch-up.</strong><p>Reads only the evidence currently identified by the encrypted “Since I last checked” delta instead of replaying the full ticker briefing.</p></div><em>Plus</em></div>
+        <div class="request-row"><div><strong>Whole-watchlist briefing.</strong><p>The existing Plus workflow can summarize recent developments across tickers from the encrypted device-local watchlist using a short-lived entitlement capability.</p></div><em>Plus service</em></div>
+      </div>
+      <div class="guardrail wide-guardrail"><strong>Target duration is not a content-generation mandate.</strong><span>The system does not pad a 10-minute format with unsupported commentary merely to reach ten minutes. Runtime expands only when enough sourced evidence is available.</span></div>
     </section>
 
     <section class="section-band shell">
@@ -136,8 +159,20 @@
         <h2>What the design helps reduce—and what it cannot solve.</h2>
       </div>
       <div class="audience-grid">
-        <article class="audience-card"><p class="eyebrow">Designed to reduce</p><h2>Unnecessary central knowledge.</h2><ul><li>Readable portfolio collection merely to research a ticker.</li><li>Readable watchlists sitting in the sync relay.</li><li>Ad-tech dependence on a detailed financial profile.</li><li>Unexplained interpretation detached from evidence.</li><li>Silent last-writer-wins assumptions during trusted-device sync.</li></ul></article>
-        <article class="audience-card trader-card"><p class="eyebrow">Not solved by architecture alone</p><h2>Endpoint and source risk still exist.</h2><ul><li>A compromised device or browser can expose information while it is readable.</li><li>Malicious extensions, malware, keylogging or screen capture remain endpoint risks.</li><li>Public data can be delayed, incomplete or wrong.</li><li>Interpretive labels can be wrong and must not replace source review.</li><li>Independent security review remains important before broad production-hardening claims.</li></ul></article>
+        <article class="audience-card"><p class="eyebrow">Designed to reduce</p><h2>Unnecessary central knowledge.</h2><ul><li>Readable portfolio collection merely to research a ticker.</li><li>Readable watchlists sitting in the sync relay.</li><li>Readable research-history checkpoints stored by the market service.</li><li>Ad-tech dependence on a detailed financial profile.</li><li>Unexplained interpretation detached from evidence.</li><li>Silent last-writer-wins assumptions during trusted-device sync.</li></ul></article>
+        <article class="audience-card trader-card"><p class="eyebrow">Not solved by architecture alone</p><h2>Endpoint and source risk still exist.</h2><ul><li>A compromised device or browser can expose information while it is readable.</li><li>Malicious extensions, malware, keylogging or screen capture remain endpoint risks.</li><li>Public data can be delayed, incomplete or wrong.</li><li>Interpretive labels can be wrong and must not replace source review.</li><li>Research memory is device-local today, so another device may have a different checkpoint.</li><li>Independent security review remains important before broad production-hardening claims.</li></ul></article>
+      </div>
+    </section>
+
+    <section class="section-band shell">
+      <div class="section-intro narrow">
+        <p class="eyebrow">Current product boundary</p>
+        <h2>Free evidence. Paid continuity and automation.</h2>
+        <p>The architecture supports a business model in which users can evaluate the research quality before paying. Plus monetizes repeated effort that the system can remove.</p>
+      </div>
+      <div class="audience-grid">
+        <article class="audience-card"><p class="eyebrow">Free</p><h2>Single-ticker research remains useful.</h2><ul><li>Market snapshot and recent ticker-linked coverage.</li><li>Catalyst direction and impact context.</li><li>Returned SEC filings and original source links.</li><li>Encrypted watchlist and optional encrypted sync.</li><li>3-, 5- and 10-minute single-ticker Research Radio formats.</li></ul></article>
+        <article class="audience-card trader-card"><p class="eyebrow">Plus</p><h2>Pay for memory and saved time.</h2><ul><li>Encrypted “Since I last checked” device-local research memory.</li><li>Changes-only Research Radio catch-up.</li><li>Whole-watchlist briefing.</li><li>Scheduled briefing, history and advanced alert workflows.</li></ul></article>
       </div>
     </section>
 
@@ -145,13 +180,13 @@
       <div class="section-intro narrow">
         <p class="eyebrow">Why this architecture matters commercially</p>
         <h2>Monetize research value, not a user's portfolio profile.</h2>
-        <p>The same boundaries that support privacy can become product differentiation. A paid research product can charge for faster synthesis, deeper history, alerts, timelines and workflow—not for harvesting detailed holdings to build an advertising profile.</p>
+        <p>The same boundaries that support privacy can become product differentiation. A paid research product can charge for continuity, synthesis, alerts, timelines and workflow—not for harvesting detailed holdings to build an advertising profile.</p>
       </div>
-      <div class="future-note"><strong>Architectural direction, not a claim of current availability:</strong> the normalized evidence and catalyst layer can later support paid research history, “since I last checked,” scheduled briefings, team research views, developer APIs or enterprise integrations while keeping the same evidence/provenance model. Each future capability should preserve the minimum-data boundary appropriate to its use case.</div>
+      <div class="future-note"><strong>Future architectural direction:</strong> the normalized evidence and provenance layer can later support encrypted cross-device research-memory sync, team research views, developer APIs or enterprise integrations. Those capabilities are not represented here as currently available, and each should preserve the minimum-data boundary appropriate to its use case.</div>
     </section>
 
     <section class="final-cta architecture-cta shell">
-      <div><p class="eyebrow">See the architecture in use</p><h2>Start with one ticker.</h2><p>Open Ticker Watch, select a public company, inspect the catalysts and SEC filings, and trace an interpretation back to its source.</p></div>
+      <div><p class="eyebrow">See the architecture in use</p><h2>Start with one ticker.</h2><p>Open Ticker Watch, select a public company, inspect catalysts and SEC filings, create an encrypted research-memory baseline if you have Plus, and listen through Research Radio.</p></div>
       <a class="primary-link" href="/trade/">Open Ticker Watch</a>
     </section>
   </main>
