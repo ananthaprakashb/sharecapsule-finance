@@ -41,6 +41,7 @@
 
   async function start() {
     await loadOptional('./since-last-checked.js', 'Ticker Watch research memory');
+    await loadOptional('./research-radio.js', 'Ticker Watch Research Radio');
     await loadOptional('./watchlist-briefing.js', 'Ticker Watch Plus briefing UI');
     await loadOptional('./briefing-history.js', 'Ticker Watch briefing history UI');
 
