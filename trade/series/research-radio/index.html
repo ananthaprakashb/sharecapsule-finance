@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07101d">
+  <meta name="description" content="How Ticker Watch builds Research Radio in the browser from already-rendered market evidence, with 3, 5, and 10-minute formats plus Plus changes-only audio."><meta name="referrer" content="no-referrer"><meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://finance.sharecapsule.org/trade/series/research-radio/"><link rel="icon" type="image/png" href="/assets/golden-hand-growth-prosperity.png">
+  <meta property="og:title" content="Building Research Radio in the Browser"><meta property="og:description" content="Turning sourced market research into a listening experience without creating a new portfolio-data pipeline."><meta property="og:type" content="article"><meta property="og:url" content="https://finance.sharecapsule.org/trade/series/research-radio/"><meta property="og:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta name="twitter:card" content="summary"><meta name="twitter:title" content="Building Research Radio in the Browser"><meta name="twitter:description" content="Inside Ticker Watch, part 4: source-linked browser audio for market research."><meta name="twitter:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; connect-src 'none'; script-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Building Research Radio in the Browser — Inside Ticker Watch</title><link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<header class="topbar"><div class="shell topbar-inner"><a class="brand" href="/"><img src="/assets/golden-hand-growth-prosperity.png" alt=""><span>ShareCapsule Finance</span></a><nav><a href="/trade/">Ticker Watch</a><a href="/trade/architecture/">Architecture</a><a class="nav-cta" href="/trade/series/">Technical series</a></nav></div></header>
+<main>
+<section class="article-hero shell"><p class="eyebrow">Inside Ticker Watch · 04</p><h1>Building Research Radio in the Browser</h1><p class="lead">Audio is useful when it compresses research, not when it invents more content. Ticker Watch builds its single-ticker briefing from evidence already rendered in the browser and keeps the original source links beside the transcript.</p><div class="meta"><span>Browser architecture</span><span>Speech synthesis</span><span>August 30, 2026</span></div></section>
+<section class="shell article-layout"><article class="article">
+<p>Market dashboards assume the user is looking at a screen. But many research moments happen while walking, commuting, exercising, or doing another task. The obvious product response is audio. The less obvious engineering question is: <strong>where should the audio briefing be assembled?</strong></p>
+<p>For Ticker Watch’s single-ticker workflow, the research is already in the browser. Headlines, summaries, direction context, impact labels, SEC filing links, and the selected ticker are present. Sending that same material to another ShareCapsule service just to reconstruct a transcript would create an additional content pipeline without adding evidence.</p>
+<div class="callout"><strong>Current design:</strong> the browser assembles the Research Radio transcript from the research already displayed. A local system voice is preferred when the browser reports one; otherwise browser speech behavior may depend on the platform.</div>
+
+<h2>From research cards to spoken segments</h2>
+<p>The audio layer does not scrape arbitrary page text. It extracts structured pieces from the rendered research interface and turns them into ordered segments.</p>
+<div class="code-flow"><div>Rendered quote, news cards, context labels, SEC filings</div><div>Prioritize high-impact and directional evidence</div><div>Build intro + evidence segments + research guardrail closing</div><div>Render transcript with original-source links</div><div>Speak segments through browser speech synthesis</div></div>
+<p>This architecture keeps the transcript inspectable. The user can see exactly what the browser intends to say before or while listening, and source links remain available for anything that deserves deeper reading.</p>
+
+<h2>Why there are 3, 5, and 10-minute formats</h2>
+<p>Different research moments need different levels of compression. We introduced three target formats:</p>
+<table class="data-table"><thead><tr><th>Format</th><th>Goal</th><th>Evidence behavior</th></tr></thead><tbody><tr><td>3-minute quick scan</td><td>Fast orientation</td><td>Prioritize a few highest-impact or directional stories</td></tr><tr><td>5-minute research brief</td><td>Default review</td><td>More stories, more context, selected SEC evidence</td></tr><tr><td>10-minute deep dive</td><td>Longer research session</td><td>Broader evidence set, additional context and filings</td></tr></tbody></table>
+<p>The word <strong>target</strong> is important. If only two meaningful sourced items exist, the 10-minute mode should not pad the briefing with invented commentary merely to hit a duration target. Research Radio estimates runtime from the actual generated words and selected playback speed.</p>
+<p>This creates a useful product principle: <strong>duration is subordinate to evidence.</strong></p>
+
+<h2>Prioritization before narration</h2>
+<p>Audio is sequential. A visual dashboard lets the eye jump around; a spoken briefing forces an order. That means prioritization becomes part of the audio architecture.</p>
+<p>Ticker Watch sorts toward higher-impact evidence and gives additional priority to clearly directional news. Longer formats can include more lower-priority material and SEC filings. The purpose is not to predict price movement. It is to put the evidence most likely to deserve attention earlier in the listening sequence.</p>
+<p>Every spoken story retains the same conceptual boundaries as the visual product:</p>
+<ul><li>what happened;</li><li>how the company-news direction is labeled;</li><li>how significant the event appears for research prioritization;</li><li>why it may matter;</li><li>where to open the original source.</li></ul>
+
+<h2>Changes-only audio</h2>
+<p>The most interesting audio mode appears when Research Radio is combined with encrypted research memory. Plus users can choose <strong>Changes only</strong>, which reads the newly surfaced items currently shown by “Since I last checked.”</p>
+<p>That creates a compact workflow:</p>
+<div class="code-flow"><div>Encrypted device-local checkpoint</div><div>Fresh ticker evidence</div><div>Delta: new stories + new filings</div><div>Changes-only Research Radio transcript</div><div>Listen, then open only the sources that matter</div></div>
+<p>The checkpoint itself remains local to the device in the current design. The audio module consumes the already-rendered delta rather than sending the checkpoint to an audio backend.</p>
+
+<h2>Why browser speech synthesis?</h2>
+<p>Browser speech synthesis has attractive privacy and cost properties for this use case. It can speak a locally constructed transcript without requiring ShareCapsule to upload the transcript to a text-to-speech service merely for playback.</p>
+<p>But browser speech is not perfectly uniform:</p>
+<ul><li>voice availability differs by operating system and browser;</li><li>some reported voices are local while platform defaults may use remote services;</li><li>pause/resume behavior can vary;</li><li>mobile browsers may impose user-interaction restrictions;</li><li>voice quality is not consistent across devices.</li></ul>
+<p>For that reason, the product says it <strong>prefers a local system voice when the browser reports one</strong>. It does not claim that every possible browser default is guaranteed local.</p>
+
+<h2>The transcript is part of the trust model</h2>
+<p>A good market podcast can sound authoritative. That is precisely why the visible transcript matters. Ticker Watch keeps the spoken segments on the page, along with the source links. The user can inspect the wording instead of receiving a disembodied voice with no provenance.</p>
+<p>The closing segment also repeats the product boundary: direction and impact organize research; they do not predict price movement or recommend a trade.</p>
+
+<h2>Free audio vs paid automation</h2>
+<p>We intentionally keep the core single-ticker Research Radio formats in the free experience. They operate on research the user already loaded and demonstrate the product’s information-compression value.</p>
+<p>Plus focuses on continuity and automation:</p>
+<ul><li>changes-only audio from encrypted research memory;</li><li>whole-watchlist briefings;</li><li>scheduled briefings;</li><li>briefing history and advanced alert workflows.</li></ul>
+<p>That commercial boundary matches the technical one. Free answers, “Help me understand this ticker now.” Plus increasingly answers, “Keep track of my research workflow over time.”</p>
+
+<h2>Failure modes we care about</h2>
+<h3>Audio overconfidence</h3><p>Spoken language can make a weak interpretation sound certain. Wording must preserve uncertainty and label meanings.</p>
+<h3>Source drift</h3><p>If the underlying rendered evidence changes, the transcript should be regenerated rather than continuing to speak stale segments.</p>
+<h3>Artificial padding</h3><p>A target duration must never become a reason to fabricate extra market commentary.</p>
+<h3>Voice privacy ambiguity</h3><p>The application cannot honestly describe every browser’s default speech path as local. The UI therefore reports what it knows about local voice availability and states the limitation.</p>
+
+<h2>What this means for investors</h2>
+<p>The value is not “AI radio” as a novelty. It is research compression with provenance. A user can choose a short scan, a deeper briefing, or a changes-only catch-up, then open the original sources when something deserves attention.</p>
+<div class="callout gold"><strong>The broader lesson:</strong> audio should be a presentation layer over evidence, not a new black box between the investor and the source.</div>
+
+<h2>What comes next</h2>
+<p>The next engineering problems are larger-scale continuity: whole-watchlist “since last checked,” encrypted cross-device research-memory synchronization, more robust source identity, and eventually normalized research APIs that preserve the same minimum-data and provenance boundaries.</p>
+<div class="next-card"><a href="/trade/architecture/"><strong>Explore the full Ticker Watch architecture →</strong><br><span>See how the current research, encrypted memory, Research Radio, and Plus automation layers fit together.</span></a></div>
+</article><aside class="side"><strong>Inside Ticker Watch</strong><a href="../minimum-data-market-research/">01 · Minimum-data research</a><a href="../encrypted-research-memory/">02 · Encrypted research memory</a><a href="../explainable-catalysts/">03 · Explainable catalysts</a><a class="current" href="./">04 · Research Radio</a><a href="/trade/architecture/">Full architecture →</a></aside></section>
+</main>
+<footer class="footer"><div class="shell footer-inner"><span>ShareCapsule Finance engineering series. Educational and architectural information, not investment advice.</span><nav><a href="/trade/series/">Series index</a><a href="/trade/architecture/">Architecture</a><a href="/trade/">Ticker Watch</a></nav></div></footer>
+</body></html>

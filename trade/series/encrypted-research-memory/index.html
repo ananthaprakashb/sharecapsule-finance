@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07101d">
+  <meta name="description" content="How Ticker Watch implements device-local encrypted research checkpoints for its Since I last checked feature."><meta name="referrer" content="no-referrer"><meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://finance.sharecapsule.org/trade/series/encrypted-research-memory/"><link rel="icon" type="image/png" href="/assets/golden-hand-growth-prosperity.png">
+  <meta property="og:title" content="Building Encrypted Since I Last Checked Research Memory"><meta property="og:description" content="A local-first design for remembering market evidence without creating a readable server-side research diary."><meta property="og:type" content="article"><meta property="og:url" content="https://finance.sharecapsule.org/trade/series/encrypted-research-memory/"><meta property="og:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta name="twitter:card" content="summary"><meta name="twitter:title" content="Building Encrypted Since I Last Checked Research Memory"><meta name="twitter:description" content="Inside Ticker Watch, part 2: private continuity for repeated market research."><meta name="twitter:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; connect-src 'none'; script-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Building Encrypted “Since I Last Checked” Research Memory — Inside Ticker Watch</title><link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<header class="topbar"><div class="shell topbar-inner"><a class="brand" href="/"><img src="/assets/golden-hand-growth-prosperity.png" alt=""><span>ShareCapsule Finance</span></a><nav><a href="/trade/">Ticker Watch</a><a href="/trade/architecture/">Architecture</a><a class="nav-cta" href="/trade/series/">Technical series</a></nav></div></header>
+<main>
+<section class="article-hero shell"><p class="eyebrow">Inside Ticker Watch · 02</p><h1>Building Encrypted “Since I Last Checked” Research Memory</h1><p class="lead">The hard part of market monitoring is not fetching the same feed again. It is knowing what is actually new. We wanted that continuity without creating a readable server-side history of every company a user follows.</p><div class="meta"><span>Local-first state</span><span>AES-GCM</span><span>August 30, 2026</span></div></section>
+<section class="shell article-layout"><article class="article">
+<p>Suppose a user reviews NVDA at 8:00 AM, reads three stories, opens one SEC filing, and returns at 2:00 PM. A conventional feed can simply show the latest page again. The user must mentally reconstruct what was already there.</p>
+<p>“Since I last checked” changes the unit of value. Instead of another feed, the product answers a narrower question: <strong>which evidence items in the current result have not been seen by this device before?</strong></p>
+<div class="callout"><strong>Important semantic choice:</strong> the first check is a baseline, not a fake delta. Without an earlier checkpoint, the system cannot honestly call the current items “new since last time.”</div>
+
+<h2>The local checkpoint</h2>
+<p>The current implementation stores one encrypted checkpoint per ticker in the same device-local IndexedDB environment used by Ticker Watch. The checkpoint contains the ticker, the time of the successful check, and identifiers for evidence already seen.</p>
+<div class="code-flow"><div>Current normalized news + SEC filings</div><div>Compare evidence keys with prior encrypted checkpoint</div><div>Render only newly surfaced items as the delta</div><div>Merge current keys into remembered set</div><div>Encrypt and replace device-local checkpoint</div></div>
+<p>The checkpoint is encrypted with AES-GCM using the existing device-local Ticker Watch key. The billing service does not receive the checkpoint. The public market gateway does not receive the checkpoint. Billing is asked only whether the account has the entitlement for the feature.</p>
+
+<h2>Evidence identity matters</h2>
+<p>A delta feature is only as good as its idea of identity. If the same story is represented differently on every request, the product will repeatedly tell the user that an old story is new.</p>
+<p>Ticker Watch prefers a stable HTTPS source URL when available. When a source URL is unavailable, it falls back to normalized descriptive material such as title and date. News items and SEC filings use separate namespaces so a filing and an article cannot collide merely because they have similar text.</p>
+<p>This is intentionally pragmatic rather than magical. News providers can republish, rewrite, or change URLs. A robust production research-memory layer should continue improving canonicalization and provider-specific identity handling as source coverage grows.</p>
+
+<h2>Why remember keys instead of full articles?</h2>
+<p>The local checkpoint does not need to become a duplicate archive of every article body. For the purpose of deciding “seen before or not,” compact evidence keys are enough. The current design caps remembered keys per ticker to avoid unbounded local growth.</p>
+<table class="data-table"><thead><tr><th>Checkpoint field</th><th>Purpose</th><th>Where readable</th></tr></thead><tbody><tr><td>Ticker</td><td>Scopes the checkpoint</td><td>Trusted browser while decrypted</td></tr><tr><td>checkedAt</td><td>Explains the comparison point</td><td>Trusted browser while decrypted</td></tr><tr><td>Seen news keys</td><td>Prevent old stories from being re-labeled as new</td><td>Trusted browser while decrypted</td></tr><tr><td>Seen filing keys</td><td>Track newly surfaced SEC evidence separately</td><td>Trusted browser while decrypted</td></tr></tbody></table>
+
+<h2>Entitlement is separate from memory</h2>
+<p>One architectural temptation is to store premium state in the same backend that verifies subscriptions. We deliberately separate those concerns. The account service can answer, “Is this feature enabled?” without becoming the owner of the research checkpoint.</p>
+<p>That gives us a cleaner privacy boundary:</p>
+<ul><li><strong>Billing service:</strong> identity, subscription state, entitlement.</li><li><strong>Market gateway:</strong> selected ticker and public evidence retrieval.</li><li><strong>Trusted browser:</strong> encrypted checkpoint and delta comparison.</li></ul>
+<p>This separation also limits the consequences of a compromise. A billing database should not automatically become a detailed record of the companies a user repeatedly checks.</p>
+
+<h2>Why device-local first?</h2>
+<p>Cross-device continuity sounds obviously better, but it introduces hard questions: which device checkpoint wins, how are concurrent updates merged, how are research-memory keys transferred, and how do we preserve the rule that the relay should not read them?</p>
+<p>The first version therefore makes a conservative promise: <strong>the checkpoint is private to this device.</strong> If the user checks NVDA on a laptop and later opens a phone, those devices currently maintain separate “last checked” histories.</p>
+<p>That limitation is visible in the product rather than hidden. We would rather ship a smaller privacy boundary we can explain than imply cross-device continuity before the cryptographic and conflict semantics are ready.</p>
+
+<h2>Failure modes we care about</h2>
+<h3>Provider churn</h3><p>A source may alter URLs or article metadata. That can cause a previously read item to appear new. Canonical source identity is an ongoing engineering problem.</p>
+<h3>Incomplete current evidence</h3><p>“No new items” means no unseen items in the evidence currently returned. It does not prove that nothing happened anywhere in the market.</p>
+<h3>Compromised endpoint</h3><p>AES-GCM protects stored checkpoint data from a relay or casual storage inspection. It does not protect against malware or a hostile extension observing the checkpoint after the trusted browser decrypts it.</p>
+<h3>Baseline reset</h3><p>If the local checkpoint is deleted, corrupted, or intentionally reset, the next successful check becomes a new baseline. The system should not silently reconstruct history it no longer has.</p>
+
+<h2>Why this is a paid feature</h2>
+<p>We want the underlying evidence to remain useful in the free product. The user can still load a ticker, inspect news, open SEC filings, follow sources, and generate single-ticker audio. What Plus adds here is <strong>continuity</strong>: the software remembers the research work already completed and reduces repeated reading.</p>
+<p>That is a healthier monetization boundary than withholding the primary source itself.</p>
+
+<h2>What this means for investors</h2>
+<p>The user benefit is simple: after a baseline exists, a refresh can focus attention on newly surfaced evidence. Instead of asking, “Which of these seven cards did I already read?” the product can say, “Two stories and one filing are new to this device’s research memory.”</p>
+<div class="callout gold"><strong>The broader lesson:</strong> useful personalization does not always require a large central profile. Sometimes a small encrypted state machine on the user’s device is enough.</div>
+
+<h2>Next: interpretation without prediction</h2>
+<p>Once the product knows which evidence is new, the next problem is prioritization. Not every headline matters equally, but ranking evidence creates a dangerous temptation to turn research context into a stock-price prediction. The next article explains the boundary.</p>
+<div class="next-card"><a href="../explainable-catalysts/"><strong>Next: News Direction Is Not Price Prediction →</strong><br><span>How Ticker Watch separates evidence, direction, impact, and source provenance.</span></a></div>
+</article><aside class="side"><strong>Inside Ticker Watch</strong><a href="../minimum-data-market-research/">01 · Minimum-data research</a><a class="current" href="./">02 · Encrypted research memory</a><a href="../explainable-catalysts/">03 · Explainable catalysts</a><a href="../research-radio/">04 · Research Radio</a><a href="/security/">Security model →</a></aside></section>
+</main>
+<footer class="footer"><div class="shell footer-inner"><span>ShareCapsule Finance engineering series. Educational and architectural information, not investment advice.</span><nav><a href="/trade/series/">Series index</a><a href="/security/">Security</a><a href="/trade/">Ticker Watch</a></nav></div></footer>
+</body></html>

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07101d">
+  <meta name="description" content="Why Ticker Watch separates public evidence, news direction, event significance, and source provenance instead of presenting a stock-price prediction."><meta name="referrer" content="no-referrer"><meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://finance.sharecapsule.org/trade/series/explainable-catalysts/"><link rel="icon" type="image/png" href="/assets/golden-hand-growth-prosperity.png">
+  <meta property="og:title" content="News Direction Is Not Price Prediction"><meta property="og:description" content="Designing explainable catalyst analysis without collapsing research context into a trade signal."><meta property="og:type" content="article"><meta property="og:url" content="https://finance.sharecapsule.org/trade/series/explainable-catalysts/"><meta property="og:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta name="twitter:card" content="summary"><meta name="twitter:title" content="News Direction Is Not Price Prediction"><meta name="twitter:description" content="Inside Ticker Watch, part 3: evidence, direction, impact, and source provenance."><meta name="twitter:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; connect-src 'none'; script-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>News Direction Is Not Price Prediction — Inside Ticker Watch</title><link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<header class="topbar"><div class="shell topbar-inner"><a class="brand" href="/"><img src="/assets/golden-hand-growth-prosperity.png" alt=""><span>ShareCapsule Finance</span></a><nav><a href="/trade/">Ticker Watch</a><a href="/trade/architecture/">Architecture</a><a class="nav-cta" href="/trade/series/">Technical series</a></nav></div></header>
+<main>
+<section class="article-hero shell"><p class="eyebrow">Inside Ticker Watch · 03</p><h1>News Direction Is Not Price Prediction</h1><p class="lead">A market-research product can help organize evidence without pretending it knows the next price move. The architecture becomes safer and more useful when evidence, interpretation, significance, and prediction are treated as different layers.</p><div class="meta"><span>Explainability</span><span>Catalyst analysis</span><span>August 30, 2026</span></div></section>
+<section class="shell article-layout"><article class="article">
+<p>A headline can be favorable to a company while the stock falls. A filing can be important without being “good” or “bad.” A seemingly negative event may already be priced in. A strong earnings report can still disappoint a market that expected more.</p>
+<p>Those realities make one design mistake especially dangerous: <strong>turning news sentiment into a price forecast.</strong></p>
+<p>Ticker Watch uses direction and impact as research-organizing labels, not as a BUY/SELL/HOLD engine. The distinction is visible in both the UI and the architecture.</p>
+<div class="callout"><strong>Guardrail:</strong> “possible positive” describes company-news context. “high impact” describes event significance. Neither claims that the stock price will rise.</div>
+
+<h2>Four separate objects</h2>
+<p>The core explainability model has four parts:</p>
+<div class="code-flow"><div>Evidence: article, filing, or other public-market item</div><div>Direction: potentially positive, negative, or neutral/mixed company context</div><div>Impact: high, medium, or low event significance for prioritization</div><div>Source: original article or primary filing for verification</div></div>
+<p>The browser can then summarize the current set of evidence into a tone index. That summary is useful for orientation, but it is still a summary of the displayed coverage—not a statistical forecast of future returns.</p>
+
+<h2>Why direction and impact must be separate</h2>
+<p>Consider a CEO departure. The event may be <strong>high impact</strong> because leadership changes can materially affect a company. But the direction may be ambiguous. A planned succession could be neutral; an abrupt departure amid an investigation could be negative; a respected replacement could change how the event is interpreted.</p>
+<p>Now consider a small product award. It may be positive in tone but low impact. If the product uses only a positive/negative label, both events can look equally important. Separating direction from significance prevents that collapse.</p>
+<table class="data-table"><thead><tr><th>Evidence</th><th>Possible direction</th><th>Possible impact</th><th>Price prediction?</th></tr></thead><tbody><tr><td>Routine product recognition</td><td>Positive</td><td>Low</td><td>No</td></tr><tr><td>Material regulatory action</td><td>Negative or mixed</td><td>High</td><td>No</td></tr><tr><td>Quarterly filing</td><td>Not inherently directional</td><td>Potentially high</td><td>No</td></tr><tr><td>Management guidance change</td><td>Depends on context</td><td>Medium or high</td><td>No</td></tr></tbody></table>
+
+<h2>Primary sources deserve different treatment</h2>
+<p>SEC filings are not ordinary news cards. A 10-Q, 8-K, Form 4, or other filing is a primary regulatory source. Ticker Watch can prioritize the filing because of its type or context, but the presence of a filing should not automatically be stamped positive or negative.</p>
+<p>This matters because a research product should not encourage users to outsource reading. The filing link remains visible so the user can verify the underlying disclosure directly.</p>
+
+<h2>How the tone summary works conceptually</h2>
+<p>The current client can derive a directional summary from the returned news set by giving more weight to higher-impact items. Positive evidence contributes positive weight, negative evidence contributes negative weight, and neutral evidence contributes significance without directional weight.</p>
+<p>The result can be presented on a bounded scale such as -100 to +100. But the label attached to that number is deliberately phrased as <strong>“news tone”</strong> or <strong>“news skew.”</strong> It is not “probability of price increase.”</p>
+<p>That naming discipline matters. Product language can quietly turn a research aid into a prediction claim even if the underlying code has not changed.</p>
+
+<h2>Explainability requires reasons, not just badges</h2>
+<p>A badge saying “high impact” is not enough. The UI also needs to explain why the item was flagged. For news, Ticker Watch can show both the direction context and the impact reason. That gives the user a path to challenge the label.</p>
+<p>The hierarchy is:</p>
+<ol><li>headline and source;</li><li>summary;</li><li>direction label;</li><li>impact label;</li><li>short reason;</li><li>original-source link.</li></ol>
+<p>A good explanation is not a substitute for source review. It is a routing mechanism that helps the user decide what deserves attention first.</p>
+
+<h2>Failure modes we design around</h2>
+<h3>Ambiguous headlines</h3><p>Headlines can omit context or use dramatic language. Direction should be treated as uncertain when the evidence is mixed.</p>
+<h3>Provider summaries</h3><p>A third-party summary can be incomplete. The original source link is essential when the event is material.</p>
+<h3>Impact inflation</h3><p>If too many stories are marked high impact, the label stops helping. Significance needs conservative thresholds and periodic review.</p>
+<h3>False precision</h3><p>A tone index can look mathematically authoritative. The product must explain what it measures and, just as importantly, what it does not measure.</p>
+<h3>Investor-specific consequences</h3><p>The same event can matter differently depending on a user’s horizon, position, taxes, concentration, or strategy. Ticker Watch does not infer those consequences from a generic company-news label.</p>
+
+<h2>Why avoiding predictions improves the product</h2>
+<p>Removing the prediction layer is not merely a compliance-oriented restriction. It creates a better engineering target. The system can focus on questions that are measurable and auditable:</p>
+<ul><li>Was this evidence associated with the selected ticker?</li><li>Is the source link valid?</li><li>What is the event category?</li><li>Why was it considered significant?</li><li>Was it already seen by this device?</li><li>Can the user verify the interpretation?</li></ul>
+<p>Those questions lead naturally to better provenance, better deduplication, better testing, and clearer user expectations.</p>
+
+<h2>What this means for investors</h2>
+<p>Ticker Watch is most useful when it reduces the time required to identify what deserves reading. It is less useful—and less trustworthy—if it tries to replace the user’s thesis with a colored arrow.</p>
+<div class="callout gold"><strong>The broader lesson:</strong> explainability is not a paragraph added after an algorithm runs. It is an architectural decision to keep evidence, interpretation, significance, and prediction from becoming one opaque output.</div>
+
+<h2>Next: turn the research into audio</h2>
+<p>Once evidence is prioritized, a user should not need to stare at a dashboard to consume it. The next article explains how Ticker Watch generates a browser-side Research Radio briefing while keeping source links and research guardrails intact.</p>
+<div class="next-card"><a href="../research-radio/"><strong>Next: Building Research Radio in the Browser →</strong><br><span>How already-rendered evidence becomes a sourced listening experience.</span></a></div>
+</article><aside class="side"><strong>Inside Ticker Watch</strong><a href="../minimum-data-market-research/">01 · Minimum-data research</a><a href="../encrypted-research-memory/">02 · Encrypted research memory</a><a class="current" href="./">03 · Explainable catalysts</a><a href="../research-radio/">04 · Research Radio</a><a href="/methodology/">Methodology →</a></aside></section>
+</main>
+<footer class="footer"><div class="shell footer-inner"><span>ShareCapsule Finance engineering series. Educational and architectural information, not investment advice.</span><nav><a href="/trade/series/">Series index</a><a href="/methodology/">Methodology</a><a href="/trade/">Ticker Watch</a></nav></div></footer>
+</body></html>

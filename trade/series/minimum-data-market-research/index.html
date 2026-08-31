@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07101d">
+  <meta name="description" content="How Ticker Watch separates a private watchlist from the minimum selected-ticker request needed for public market research."><meta name="referrer" content="no-referrer"><meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://finance.sharecapsule.org/trade/series/minimum-data-market-research/"><link rel="icon" type="image/png" href="/assets/golden-hand-growth-prosperity.png">
+  <meta property="og:title" content="Why a Stock Watchlist Doesn’t Need to Live on Our Server"><meta property="og:description" content="A minimum-data architecture for privacy-first market research."><meta property="og:type" content="article"><meta property="og:url" content="https://finance.sharecapsule.org/trade/series/minimum-data-market-research/"><meta property="og:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta name="twitter:card" content="summary"><meta name="twitter:title" content="Why a Stock Watchlist Doesn’t Need to Live on Our Server"><meta name="twitter:description" content="Inside Ticker Watch, part 1: minimum-data market research architecture."><meta name="twitter:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; connect-src 'none'; script-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Why a Stock Watchlist Doesn’t Need to Live on Our Server — Inside Ticker Watch</title><link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+<header class="topbar"><div class="shell topbar-inner"><a class="brand" href="/"><img src="/assets/golden-hand-growth-prosperity.png" alt=""><span>ShareCapsule Finance</span></a><nav><a href="/trade/">Ticker Watch</a><a href="/trade/architecture/">Architecture</a><a class="nav-cta" href="/trade/series/">Technical series</a></nav></div></header>
+<main>
+<section class="article-hero shell"><p class="eyebrow">Inside Ticker Watch · 01</p><h1>Why a Stock Watchlist Doesn’t Need to Live on Our Server</h1><p class="lead">Privacy architecture often begins too late. Teams first collect a rich user profile, then ask how to secure it. Ticker Watch starts with a different question: what is the minimum information the research request actually needs?</p><div class="meta"><span>Architecture</span><span>Privacy engineering</span><span>August 30, 2026</span></div></section>
+<section class="shell article-layout"><article class="article">
+<p>A user may care about thirty companies. They may own five of them, be considering three, and merely follow the rest. A conventional market product can easily turn that preference set into a server-side profile: watchlist, holdings, positions, alerts, browsing behavior, and eventually inferred intent.</p>
+<p>Ticker Watch does not need that profile to answer a much narrower question: <strong>“What changed around NVDA?”</strong> The public market gateway needs the selected ticker. It does not need the user’s entire watchlist, brokerage balance, cost basis, or position size to retrieve recent public evidence about NVIDIA.</p>
+<div class="callout"><strong>Design rule:</strong> data minimization should happen before encryption. The safest sensitive field is often the field the service never receives.</div>
+
+<h2>The request boundary</h2>
+<p>The core single-ticker flow is intentionally simple:</p>
+<div class="code-flow"><div>Trusted browser: private watchlist + selected ticker</div><div>Request boundary: selected public ticker only</div><div>Market gateway: retrieve and normalize public evidence</div><div>Browser: render quote, news, SEC filings, context, and sources</div></div>
+<p>This is not anonymity. The request still reaches a service, and ordinary network metadata still exists. The architectural claim is narrower: the market research request does not require the application to attach a detailed investor profile to that ticker request.</p>
+
+<h2>Why keep the watchlist local?</h2>
+<p>A watchlist is deceptively sensitive. A list of public ticker symbols can reveal employer relationships, acquisition speculation, investment interests, sector concentration, or a user’s research priorities. None of those inferences are required to render a single-company research page.</p>
+<p>Ticker Watch therefore treats the watchlist as <strong>preference state</strong>, not as a prerequisite for the public evidence pipeline. The browser stores the local experience. When optional trusted-device synchronization is enabled, the design sends an AES-GCM encrypted payload to the sync relay rather than a readable ticker list.</p>
+<table class="data-table"><thead><tr><th>Data</th><th>Needed for single-ticker research?</th><th>Primary boundary</th></tr></thead><tbody><tr><td>Selected ticker</td><td>Yes</td><td>Browser → market gateway</td></tr><tr><td>Full watchlist</td><td>No</td><td>Local device / optional ciphertext sync</td></tr><tr><td>Portfolio holdings</td><td>No</td><td>Not required by Ticker Watch</td></tr><tr><td>Position size / cost basis</td><td>No</td><td>Not required by the research request</td></tr><tr><td>Public news and filings</td><td>Yes</td><td>Market evidence pipeline</td></tr></tbody></table>
+
+<h2>Encryption is the second boundary, not the first</h2>
+<p>Local-first does not mean “never synchronize.” People use multiple devices. The useful question is whether synchronization can happen without turning the relay into a readable preference database.</p>
+<p>The current design encrypts the watchlist with AES-GCM before optional sync. Trusted-device pairing transfers the necessary secret through a one-time capability flow. The relay is designed to persist ciphertext and technical synchronization metadata rather than ticker symbols in plaintext.</p>
+<p>That design still has a threat model. A compromised browser can read state while the page has decrypted it. Malware or a malicious extension can observe what the user sees. Encryption at rest does not protect data from a hostile endpoint that is actively using the key.</p>
+
+<h2>What the gateway should do—and not do</h2>
+<p>The market gateway has a useful responsibility: isolate external provider differences from the browser. News and filing providers have different schemas, identifiers, timestamps, and availability rules. The gateway normalizes the result so the client can consistently render evidence and attach research context.</p>
+<p>But normalization should not become an excuse to grow the request envelope. For a single-company refresh, the gateway should not need:</p>
+<ul><li>the rest of the watchlist;</li><li>the user’s portfolio value;</li><li>a brokerage credential;</li><li>the size of the user’s position;</li><li>the user’s financial vault.</li></ul>
+<p>Keeping that boundary small also makes the system easier to explain and audit. A privacy promise becomes more credible when the network request can be described in one sentence.</p>
+
+<h2>What we give up</h2>
+<p>Minimum-data architecture creates constraints. Without holdings, Ticker Watch cannot truthfully say, “This event affects 18% of your net worth.” Without cost basis, it cannot calculate personalized tax consequences. Without portfolio composition, it cannot perform true portfolio-level risk analysis.</p>
+<p>Those may be useful products, but they are different products with different data requirements. The architectural mistake would be collecting all of that data “just in case” while delivering only ticker research.</p>
+
+<h2>What this means for investors</h2>
+<p>For the user, the practical benefit is not a cryptographic slogan. It is a smaller trust requirement. You can research a company without first uploading the composition of your portfolio. You can keep a preferred ticker list on your own device. And when the product presents an interpretation, you can move back to the public evidence rather than being asked to trust a hidden profile-driven score.</p>
+<div class="callout gold"><strong>The broader lesson:</strong> privacy-first product design is often a product-scope decision. Decide what the feature is allowed to know before deciding where to store what it knows.</div>
+
+<h2>Where we go next</h2>
+<p>Once preference state is separated from the public research request, another problem becomes interesting: repeated checking. A user does not want the same five stories every time. The next article explains how Ticker Watch creates an encrypted device-local research checkpoint and turns a refresh into <strong>“Since I last checked.”</strong></p>
+<div class="next-card"><a href="../encrypted-research-memory/"><strong>Next: Building Encrypted “Since I Last Checked” Research Memory →</strong><br><span>How a local checkpoint remembers evidence without becoming a readable server-side research diary.</span></a></div>
+</article><aside class="side"><strong>Inside Ticker Watch</strong><a class="current" href="./">01 · Minimum-data research</a><a href="../encrypted-research-memory/">02 · Encrypted research memory</a><a href="../explainable-catalysts/">03 · Explainable catalysts</a><a href="../research-radio/">04 · Research Radio</a><a href="/trade/architecture/">Full architecture →</a></aside></section>
+</main>
+<footer class="footer"><div class="shell footer-inner"><span>ShareCapsule Finance engineering series. Educational and architectural information, not investment advice.</span><nav><a href="/trade/series/">Series index</a><a href="/security/">Security</a><a href="/trade/">Ticker Watch</a></nav></div></footer>
+</body></html>

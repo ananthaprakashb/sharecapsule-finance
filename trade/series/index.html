@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07101d">
+  <meta name="description" content="Inside Ticker Watch: a public engineering series about privacy-first market research, encrypted research memory, explainable catalysts, and browser-generated Research Radio.">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://finance.sharecapsule.org/trade/series/">
+  <link rel="icon" type="image/png" href="/assets/golden-hand-growth-prosperity.png">
+  <meta property="og:title" content="Inside Ticker Watch — Public Technical Series">
+  <meta property="og:description" content="How ShareCapsule Finance is building privacy-first, source-linked market research without requiring a brokerage portfolio upload.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://finance.sharecapsule.org/trade/series/">
+  <meta property="og:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Inside Ticker Watch — Public Technical Series">
+  <meta name="twitter:description" content="Engineering notes on local-first watchlists, encrypted research memory, explainable catalysts, and Research Radio.">
+  <meta name="twitter:image" content="https://finance.sharecapsule.org/assets/golden-hand-growth-prosperity.png">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; img-src 'self'; connect-src 'none'; script-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Inside Ticker Watch — Public Technical Series</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar"><div class="shell topbar-inner"><a class="brand" href="/"><img src="/assets/golden-hand-growth-prosperity.png" alt=""><span>ShareCapsule Finance</span></a><nav aria-label="Ticker Watch navigation"><a href="/trade/">Ticker Watch</a><a href="/trade/how-it-works/">How it works</a><a href="/trade/architecture/">Architecture</a><a class="nav-cta" href="/trade/series/">Technical series</a></nav></div></header>
+  <main>
+    <section class="hero"><div class="shell hero-grid"><div><p class="eyebrow">Public engineering series</p><h1>Inside Ticker Watch.</h1><p class="lead">A technical series about building useful market research while collecting less investor data. We publish the architecture decisions, trade-offs, privacy boundaries, and implementation patterns behind Ticker Watch instead of hiding them behind a product screenshot.</p><div class="meta"><span>Series 01</span><span>4 articles published</span><span>Updated August 30, 2026</span></div></div><div class="hero-logo"><img src="/assets/golden-hand-growth-prosperity.png" alt="Golden hand holding coins below a rising green growth arrow"></div></div></section>
+
+    <section class="shell series-grid" aria-label="Technical series articles">
+      <a class="series-card" href="./minimum-data-market-research/"><small>01 · Data minimization</small><h2>Why a Stock Watchlist Doesn’t Need to Live on Our Server</h2><p>How Ticker Watch separates a user’s private preference state from the selected public ticker needed for a market-research request.</p><span class="read">Read article →</span></a>
+      <a class="series-card" href="./encrypted-research-memory/"><small>02 · Local-first memory</small><h2>Building Encrypted “Since I Last Checked” Research Memory</h2><p>How a device-local AES-GCM checkpoint turns repeated market checking into a delta without creating a readable server-side research diary.</p><span class="read">Read article →</span></a>
+      <a class="series-card" href="./explainable-catalysts/"><small>03 · Explainability</small><h2>News Direction Is Not Price Prediction</h2><p>Why evidence, news direction, event significance, and source provenance are separate concepts—and why the product deliberately avoids collapsing them into one opaque score.</p><span class="read">Read article →</span></a>
+      <a class="series-card" href="./research-radio/"><small>04 · Browser audio</small><h2>Building Research Radio in the Browser</h2><p>How Ticker Watch converts already-rendered market evidence into 3, 5, and 10-minute listening formats without sending a portfolio to a new audio service.</p><span class="read">Read article →</span></a>
+    </section>
+
+    <section class="principles"><div class="shell"><p class="eyebrow">What the series optimizes for</p><div class="principle-grid"><div class="principle"><strong>Minimum necessary data</strong><span>Ask what the feature actually needs before asking how to encrypt everything else.</span></div><div class="principle"><strong>Evidence over authority</strong><span>Labels are useful only when the user can trace them back to the original article or filing.</span></div><div class="principle"><strong>Useful free core</strong><span>Single-ticker research stays useful. Paid features focus on continuity, memory, and automation.</span></div></div></div></section>
+  </main>
+  <footer class="footer"><div class="shell footer-inner"><span>Inside Ticker Watch is a ShareCapsule Finance engineering series. Product behavior may evolve; articles identify current boundaries and known limitations.</span><nav><a href="/trade/">Ticker Watch</a><a href="/trade/architecture/">Architecture</a><a href="/security/">Security</a><a href="/methodology/">Methodology</a></nav></div></footer>
+</body>
+</html>
