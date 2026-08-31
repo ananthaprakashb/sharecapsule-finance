@@ -29,6 +29,7 @@ jobs:
         run: |
           node --check trade/app.js
           node --check trade/briefing.js
+          node --check trade/research-radio.js
           node --check trade/watchlist-briefing.js
           node --check trade/briefing-history.js
           node --check trade/since-last-checked.js
