@@ -31,22 +31,23 @@
     });
   }
 
-  async function start() {
+  async function loadOptional(src, label) {
     try {
-      await loadScript('./watchlist-briefing.js');
-      await loadScript('./briefing-history.js');
+      await loadScript(src);
     } catch (error) {
-      console.warn('Ticker Watch Plus briefing UI could not be started.', error);
+      console.warn(`${label} could not be started.`, error);
     }
+  }
+
+  async function start() {
+    await loadOptional('./since-last-checked.js', 'Ticker Watch research memory');
+    await loadOptional('./watchlist-briefing.js', 'Ticker Watch Plus briefing UI');
+    await loadOptional('./briefing-history.js', 'Ticker Watch briefing history UI');
 
     for (let attempt = 0; attempt < 50; attempt++) {
       if (await keyExists()) {
-        try {
-          await loadScript('./sync.js');
-          await loadScript('./sync-collapse.js');
-        } catch (error) {
-          console.warn('Ticker Watch sync UI could not be started.', error);
-        }
+        await loadOptional('./sync.js', 'Ticker Watch sync');
+        await loadOptional('./sync-collapse.js', 'Ticker Watch sync controls');
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 100));
