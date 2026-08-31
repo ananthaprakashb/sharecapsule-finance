@@ -25,6 +25,15 @@ jobs:
           node --check qr.js
           node --check sync.js
 
+      - name: Check Ticker Watch JavaScript syntax
+        run: |
+          node --check trade/app.js
+          node --check trade/briefing.js
+          node --check trade/watchlist-briefing.js
+          node --check trade/briefing-history.js
+          node --check trade/since-last-checked.js
+          node --check trade/sync-loader.js
+
       - name: Check account JavaScript syntax
         run: node --check account/app.js
 
